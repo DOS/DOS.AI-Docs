@@ -2,6 +2,11 @@
 
 * [Developer Platform API](README.md)
 
+## Architecture
+
+* [GPU Cloud Architecture](GPU-CLOUD-ARCHITECTURE.md)
+* [Inference API Architecture](INFERENCE-API-ARCHITECTURE.md)
+
 ## Reference
 
 * ```yaml
