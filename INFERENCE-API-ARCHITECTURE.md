@@ -4,12 +4,40 @@
 
 This document describes the architecture for DOS.ai Serverless Inference API, allowing users to access LLM models via OpenAI-compatible API with API key authentication and usage-based billing.
 
-## Current Infrastructure
+## Current Infrastructure (January 2025)
 
-- **vLLM** container running with models loaded
-- **Cloudflare Tunnel** exposing vLLM at `api.dos.ai`
-- **Next.js Dashboard** (apps/app) for user management
-- **Next.js Landing** (apps/web) for marketing
+### Components
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| **vLLM Server** | Local PC (localhost:8000) | Docker container running LLM models with GPU |
+| **Cloudflare Tunnel** | cloudflared service | Exposes local vLLM at `inference.dos.ai` |
+| **API Gateway** | Cloudflare Worker | `api.dos.ai` - Auth, billing, rate limiting |
+| **D1 Database** | Cloudflare Edge | API keys, billing balances, usage logs |
+| **Supabase** | PostgreSQL | Users, orgs, Stripe customers, payments |
+| **Dashboard** | Vercel (apps/app) | `app.dos.ai` - User management |
+
+### Tunnel Configuration
+
+The vLLM server runs locally and is exposed via Cloudflare Tunnel:
+
+- **Tunnel Name**: AI API
+- **Tunnel ID**: `04915ff2-6f0d-49ab-8115-c36c74edbff9`
+- **Account**: `5f2a58925e790423dfafa0e6bee46b28`
+- **Public Hostname**: `inference.dos.ai` → `http://localhost:8000`
+- **Protocol**: QUIC (with HTTP/2 fallback)
+
+**Service Installation:**
+```powershell
+# Token-based service installation
+$token = "<tunnel-token-from-dashboard>"
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install $token
+Start-Service cloudflared
+```
+
+**Known Issues:**
+1. **QUIC blocked by firewall**: If UDP port 7844 is blocked, cloudflared will timeout for ~2 minutes before falling back to HTTP/2. Log shows: `INF Switching to fallback protocol http2`
+2. **Service hang on restart**: `Restart-Service cloudflared` can hang indefinitely. Use `Get-Process cloudflared | Stop-Process -Force` before starting.
 
 ---
 
@@ -18,461 +46,184 @@ This document describes the architecture for DOS.ai Serverless Inference API, al
 ### High-Level Flow
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   User App      │────▶│ Cloudflare      │────▶│  vLLM Container │
-│   (curl, SDK)   │     │ Worker (Gateway)│     │  (GPU Server)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Bexly/Apps    │────▶│ api.dos.ai      │────▶│ inference.dos.ai│────▶│  vLLM (Local)   │
+│   (API Client)  │     │ (CF Worker)     │     │ (CF Tunnel)     │     │  localhost:8000 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
                                ▼
                         ┌─────────────────┐
                         │  Cloudflare D1  │
-                        │  (Keys, Usage)  │
+                        │  (Keys, Billing)│
                         └─────────────────┘
-                               ▲
                                │
+                               │ (Future: migrate billing)
+                               ▼
 ┌─────────────────┐     ┌─────────────────┐
-│   User          │────▶│  Dashboard      │
-│   (Browser)     │     │  (apps/app)     │
+│   User          │────▶│  Dashboard      │────▶ Supabase (Users, Orgs, Stripe)
+│   (Browser)     │     │  app.dos.ai     │
 └─────────────────┘     └─────────────────┘
 ```
 
-### Request Flow
+### Request Flow with Billing
 
 ```
-1. User calls API
+1. Client sends request
    POST https://api.dos.ai/v1/chat/completions
    Authorization: Bearer dos_sk_xxx
 
-2. Cloudflare Worker receives request
-   - Extract API key from header
-   - Query D1 to validate key
-   - If invalid → 401 Unauthorized
+2. Cloudflare Worker (api.dos.ai)
+   a. Extract API key from Authorization header
+   b. Hash key with SHA-256
+   c. Query D1 to validate key and get user_id
+   d. Check billing balance (must have sufficient credits)
+   e. If insufficient balance → 402 Payment Required
 
-3. Worker forwards to vLLM
-   - Strip/replace auth header
-   - Forward request body as-is
+3. Forward to inference backend
+   POST https://inference.dos.ai/v1/chat/completions
+   (No auth needed - tunnel is internal)
 
-4. vLLM processes and responds
-   - Returns OpenAI-format response
-   - Includes usage (prompt_tokens, completion_tokens)
+4. Cloudflare Tunnel routes to local vLLM
+   POST http://localhost:8000/v1/chat/completions
 
-5. Worker logs usage
-   - Extract token counts from response
-   - Insert into D1 usage table (async)
+5. vLLM processes and returns response
+   - Includes usage: { prompt_tokens, completion_tokens, total_tokens }
 
-6. Return response to user
+6. Worker calculates and deducts cost
+   - Get model pricing from D1.model_pricing table
+   - Calculate: cost = (tokens / 1M) × price_per_million
+   - Apply minimum charge of $0.01
+   - Deduct from D1.billing.balance_cents
+   - Log transaction to D1.usage_transactions
+
+7. Return response to client
 ```
 
 ---
 
-## Components
+## Billing System (Current State)
 
-### 1. Cloudflare D1 Database
+### Token-Based Billing Flow
 
-**Schema:**
-
-```sql
--- Users table (if not using external auth)
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  name TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- API Keys table
-CREATE TABLE api_keys (
-  id TEXT PRIMARY KEY,              -- 'key_xxxx'
-  user_id TEXT NOT NULL,
-  key_prefix TEXT NOT NULL,         -- 'dos_sk_abc...' (first 8 chars for display)
-  key_hash TEXT NOT NULL,           -- SHA256 hash of full key
-  name TEXT DEFAULT 'Default',      -- User-friendly name
-  status TEXT DEFAULT 'active',     -- 'active', 'revoked'
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  last_used_at DATETIME,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Usage logs table
-CREATE TABLE usage_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  api_key_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  model TEXT NOT NULL,
-  prompt_tokens INTEGER NOT NULL,
-  completion_tokens INTEGER NOT NULL,
-  total_tokens INTEGER NOT NULL,
-  endpoint TEXT NOT NULL,           -- '/v1/chat/completions'
-  status_code INTEGER NOT NULL,
-  latency_ms INTEGER,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (api_key_id) REFERENCES api_keys(id)
-);
-
--- Daily usage aggregation (for faster queries)
-CREATE TABLE usage_daily (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
-  date DATE NOT NULL,
-  total_requests INTEGER DEFAULT 0,
-  total_prompt_tokens INTEGER DEFAULT 0,
-  total_completion_tokens INTEGER DEFAULT 0,
-  total_tokens INTEGER DEFAULT 0,
-  cost_usd REAL DEFAULT 0,
-  UNIQUE(user_id, date)
-);
-
--- Indexes
-CREATE INDEX idx_api_keys_hash ON api_keys(key_hash);
-CREATE INDEX idx_api_keys_user ON api_keys(user_id);
-CREATE INDEX idx_usage_logs_key ON usage_logs(api_key_id);
-CREATE INDEX idx_usage_logs_user_date ON usage_logs(user_id, created_at);
-CREATE INDEX idx_usage_daily_user ON usage_daily(user_id, date);
-```
-
-### 2. Cloudflare Worker (API Gateway)
-
-**Location:** `packages/api-gateway/` or separate repo
-
-**worker.ts:**
+Located in `packages/api-gateway/src/worker.ts`:
 
 ```typescript
-export interface Env {
-  DB: D1Database;
-  VLLM_BACKEND_URL: string;  // Internal vLLM URL
-  RATE_LIMIT_KV: KVNamespace; // Optional: for rate limiting
-}
+async function deductBalance(
+  db: D1Database,
+  userId: string,
+  apiKeyId: string,
+  model: string,
+  inputTokens: number,
+  outputTokens: number
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  // Get model pricing from D1
+  const pricing = await db.prepare(
+    'SELECT input_price_per_million, output_price_per_million FROM model_pricing WHERE model_id = ?'
+  ).bind(model).first();
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+  // Default pricing if model not in table
+  const inputPricePerMillion = pricing?.input_price_per_million || 10;   // $0.10/1M
+  const outputPricePerMillion = pricing?.output_price_per_million || 10; // $0.10/1M
 
-    // Health check endpoint
-    if (url.pathname === '/health') {
-      return new Response('OK', { status: 200 });
-    }
+  // Calculate cost in cents
+  const inputCostCents = Math.ceil((inputTokens / 1_000_000) * inputPricePerMillion * 100) / 100;
+  const outputCostCents = Math.ceil((outputTokens / 1_000_000) * outputPricePerMillion * 100) / 100;
+  const totalCostCents = inputCostCents + outputCostCents;
 
-    // Only handle /v1/* endpoints
-    if (!url.pathname.startsWith('/v1/')) {
-      return new Response('Not Found', { status: 404 });
-    }
+  // Minimum charge: 1 cent
+  const finalCostCents = Math.max(1, Math.round(totalCostCents * 100) / 100);
 
-    // Extract API key
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return errorResponse(401, 'Missing API key. Include Authorization: Bearer dos_sk_xxx');
-    }
-
-    const apiKey = authHeader.replace('Bearer ', '');
-
-    // Validate key format
-    if (!apiKey.startsWith('dos_sk_')) {
-      return errorResponse(401, 'Invalid API key format');
-    }
-
-    // Validate key against D1
-    const keyHash = await hashKey(apiKey);
-    const keyRecord = await env.DB.prepare(
-      'SELECT id, user_id, status FROM api_keys WHERE key_hash = ?'
-    ).bind(keyHash).first();
-
-    if (!keyRecord) {
-      return errorResponse(401, 'Invalid API key');
-    }
-
-    if (keyRecord.status !== 'active') {
-      return errorResponse(401, 'API key has been revoked');
-    }
-
-    // Update last_used_at (async, don't block)
-    ctx.waitUntil(
-      env.DB.prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?')
-        .bind(new Date().toISOString(), keyRecord.id)
-        .run()
-    );
-
-    // Forward request to vLLM
-    const startTime = Date.now();
-    const backendUrl = `${env.VLLM_BACKEND_URL}${url.pathname}`;
-
-    const backendResponse = await fetch(backendUrl, {
-      method: request.method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: request.body,
-    });
-
-    const latencyMs = Date.now() - startTime;
-    const responseBody = await backendResponse.json();
-
-    // Log usage (async)
-    if (backendResponse.ok && responseBody.usage) {
-      ctx.waitUntil(
-        logUsage(env.DB, {
-          apiKeyId: keyRecord.id,
-          userId: keyRecord.user_id,
-          model: responseBody.model,
-          promptTokens: responseBody.usage.prompt_tokens,
-          completionTokens: responseBody.usage.completion_tokens,
-          totalTokens: responseBody.usage.total_tokens,
-          endpoint: url.pathname,
-          statusCode: backendResponse.status,
-          latencyMs,
-        })
-      );
-    }
-
-    // Return response with CORS headers
-    return new Response(JSON.stringify(responseBody), {
-      status: backendResponse.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-      },
-    });
-  },
-};
-
-async function hashKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function logUsage(db: D1Database, usage: UsageLog): Promise<void> {
-  await db.prepare(`
-    INSERT INTO usage_logs
-    (api_key_id, user_id, model, prompt_tokens, completion_tokens, total_tokens, endpoint, status_code, latency_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    usage.apiKeyId,
-    usage.userId,
-    usage.model,
-    usage.promptTokens,
-    usage.completionTokens,
-    usage.totalTokens,
-    usage.endpoint,
-    usage.statusCode,
-    usage.latencyMs
-  ).run();
-}
-
-function errorResponse(status: number, message: string): Response {
-  return new Response(JSON.stringify({ error: { message, type: 'invalid_request_error' } }), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-```
-
-**wrangler.toml:**
-
-```toml
-name = "dos-api-gateway"
-main = "src/worker.ts"
-compatibility_date = "2024-01-01"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "dos-inference"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-
-[vars]
-VLLM_BACKEND_URL = "https://vllm-internal.dos.ai"
-```
-
-### 3. Dashboard API Routes (apps/app)
-
-**File structure:**
-
-```
-apps/app/src/app/api/
-├── keys/
-│   ├── route.ts           # GET (list), POST (create)
-│   └── [id]/
-│       └── route.ts       # DELETE (revoke)
-└── usage/
-    └── route.ts           # GET usage stats
-```
-
-**apps/app/src/app/api/keys/route.ts:**
-
-```typescript
-import { getD1 } from '@/lib/cloudflare';
-import { getUser } from '@/lib/auth';
-import { nanoid } from 'nanoid';
-
-// GET /api/keys - List user's API keys
-export async function GET() {
-  const user = await getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const db = getD1();
-  const keys = await db.prepare(`
-    SELECT id, key_prefix, name, status, created_at, last_used_at
-    FROM api_keys
-    WHERE user_id = ? AND status = 'active'
-    ORDER BY created_at DESC
-  `).bind(user.id).all();
-
-  return Response.json({ keys: keys.results });
-}
-
-// POST /api/keys - Create new API key
-export async function POST(request: Request) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { name = 'Default' } = await request.json();
-
-  // Generate key: dos_sk_<32 random chars>
-  const keyId = `key_${nanoid(12)}`;
-  const secretPart = nanoid(32);
-  const fullKey = `dos_sk_${secretPart}`;
-  const keyPrefix = `dos_sk_${secretPart.substring(0, 4)}...`;
-  const keyHash = await hashKey(fullKey);
-
-  const db = getD1();
-  await db.prepare(`
-    INSERT INTO api_keys (id, user_id, key_prefix, key_hash, name)
-    VALUES (?, ?, ?, ?, ?)
-  `).bind(keyId, user.id, keyPrefix, keyHash, name).run();
-
-  // Return full key only once - user must save it
-  return Response.json({
-    id: keyId,
-    key: fullKey,  // Only shown once!
-    name,
-    created_at: new Date().toISOString(),
-  });
-}
-
-async function hashKey(key: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-```
-
-**apps/app/src/app/api/keys/[id]/route.ts:**
-
-```typescript
-import { getD1 } from '@/lib/cloudflare';
-import { getUser } from '@/lib/auth';
-
-// DELETE /api/keys/:id - Revoke API key
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const db = getD1();
-
-  // Verify ownership and revoke
+  // Deduct from balance
   const result = await db.prepare(`
-    UPDATE api_keys
-    SET status = 'revoked'
-    WHERE id = ? AND user_id = ?
-  `).bind(params.id, user.id).run();
+    UPDATE billing
+    SET balance_cents = balance_cents - ?, updated_at = datetime('now')
+    WHERE user_id = ? AND balance_cents >= ?
+  `).bind(finalCostCents, userId, finalCostCents).run();
 
   if (result.changes === 0) {
-    return Response.json({ error: 'Key not found' }, { status: 404 });
+    return { success: false, error: 'Insufficient balance' };
   }
 
-  return Response.json({ success: true });
+  // Log the transaction
+  await db.prepare(`
+    INSERT INTO usage_transactions
+    (user_id, api_key_id, model, input_tokens, output_tokens, cost_cents, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `).bind(userId, apiKeyId, model, inputTokens, outputTokens, finalCostCents).run();
+
+  return { success: true };
 }
 ```
 
-**apps/app/src/app/api/usage/route.ts:**
+### Pricing Table
 
-```typescript
-import { getD1 } from '@/lib/cloudflare';
-import { getUser } from '@/lib/auth';
+| Model | Input (per 1M tokens) | Output (per 1M tokens) |
+|-------|----------------------|------------------------|
+| Llama 3.3 70B | $0.20 | $0.20 |
+| Llama 3.1 8B | $0.05 | $0.05 |
+| Qwen 2.5 72B | $0.25 | $0.25 |
+| Default | $0.10 | $0.10 |
 
-// GET /api/usage?period=7d
-export async function GET(request: Request) {
-  const user = await getUser();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+### Adding Credits (Admin Only)
 
-  const url = new URL(request.url);
-  const period = url.searchParams.get('period') || '7d';
-
-  const days = period === '30d' ? 30 : period === '24h' ? 1 : 7;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const db = getD1();
-
-  // Get aggregated usage
-  const usage = await db.prepare(`
-    SELECT
-      DATE(created_at) as date,
-      COUNT(*) as requests,
-      SUM(prompt_tokens) as prompt_tokens,
-      SUM(completion_tokens) as completion_tokens,
-      SUM(total_tokens) as total_tokens
-    FROM usage_logs
-    WHERE user_id = ? AND created_at >= ?
-    GROUP BY DATE(created_at)
-    ORDER BY date DESC
-  `).bind(user.id, startDate.toISOString()).all();
-
-  // Get totals
-  const totals = await db.prepare(`
-    SELECT
-      COUNT(*) as total_requests,
-      SUM(total_tokens) as total_tokens
-    FROM usage_logs
-    WHERE user_id = ? AND created_at >= ?
-  `).bind(user.id, startDate.toISOString()).first();
-
-  return Response.json({
-    usage: usage.results,
-    totals,
-    period,
-  });
-}
+Via Wrangler CLI:
+```bash
+# Find user_id from Supabase by email
+# Then update D1 directly:
+wrangler d1 execute dos-inference --command="UPDATE billing SET balance_cents = balance_cents + 100000 WHERE user_id = 'xxx'"
+# 100000 cents = $1000
 ```
-
-### 4. Dashboard UI (apps/app)
-
-**Pages to create:**
-
-```
-apps/app/src/app/
-├── api-keys/
-│   └── page.tsx          # API Keys management
-├── usage/
-│   └── page.tsx          # Usage dashboard
-└── docs/
-    └── page.tsx          # Quick start guide
-```
-
-**API Keys Page Features:**
-- List all active keys (showing prefix only: `dos_sk_abc1...`)
-- Create new key (show full key once, copy button)
-- Revoke key
-- Rename key
-
-**Usage Page Features:**
-- Chart: requests/tokens over time
-- Total tokens used this month
-- Cost estimate
-- Per-key breakdown
 
 ---
 
-## API Endpoints (User-Facing)
+## Database Architecture (Hybrid)
 
-### OpenAI-Compatible Endpoints
+### Cloudflare D1 (Edge-Optimized)
+
+**Purpose**: Low-latency operations at the edge (API key validation, balance checks, usage logging)
+
+**Tables**:
+- `api_keys` - API key storage with SHA-256 hashes
+- `billing` - User balance in cents
+- `usage_transactions` - Per-request usage logs
+- `usage_logs` - Legacy usage tracking
+- `model_pricing` - Per-model pricing configuration
+
+**Why D1**:
+- Sub-millisecond latency at edge
+- Co-located with API Gateway Worker
+- Handles high-frequency reads (every API request)
+
+### Supabase (PostgreSQL)
+
+**Purpose**: Business data, authentication, Stripe integration
+
+**Tables**:
+- `auth.users` - Supabase Auth users
+- `public.organizations` - User organizations
+- `public.organization_members` - Org membership
+- `public.stripe_customers` - Stripe customer IDs
+- `public.payment_transactions` - Payment history
+- `public.subscription_plans` - Available plans
+
+**Why Supabase**:
+- Row-level security (RLS) for multi-tenant data
+- Direct Stripe webhook integration
+- Full-featured PostgreSQL for complex queries
+- Already handles auth and user management
+
+### Future Migration
+
+See [BILLING-MIGRATION-ROADMAP.md](./BILLING-MIGRATION-ROADMAP.md) for the plan to:
+1. Keep API keys and rate limiting in D1 (edge-fast)
+2. Migrate billing/credits to Supabase (single source of truth)
+3. Remove duplicate data and inconsistency risk
+
+---
+
+## API Endpoints
+
+### Public Inference API (api.dos.ai)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -480,8 +231,9 @@ apps/app/src/app/
 | `/v1/completions` | POST | Text completions |
 | `/v1/models` | GET | List available models |
 | `/v1/embeddings` | POST | Text embeddings |
+| `/health` | GET | Health check |
 
-### Request Format
+### Request Example
 
 ```bash
 curl https://api.dos.ai/v1/chat/completions \
@@ -522,77 +274,98 @@ curl https://api.dos.ai/v1/chat/completions \
 }
 ```
 
-### Error Format
+### Error Responses
 
-```json
-{
-  "error": {
-    "message": "Invalid API key",
-    "type": "invalid_request_error",
-    "code": "invalid_api_key"
-  }
-}
-```
+| Status | Error | Description |
+|--------|-------|-------------|
+| 401 | `invalid_api_key` | API key missing or invalid |
+| 402 | `insufficient_balance` | Not enough credits |
+| 429 | `rate_limit_exceeded` | Too many requests |
+| 500 | `internal_error` | Backend error |
 
 ---
 
-## Pricing Model
+## Dashboard API Routes (apps/app)
 
-| Model | Input (per 1M tokens) | Output (per 1M tokens) |
-|-------|----------------------|------------------------|
-| Llama 3.3 70B | $0.20 | $0.20 |
-| Llama 3.1 8B | $0.05 | $0.05 |
-| Qwen 2.5 72B | $0.25 | $0.25 |
+### Key Management
 
-**Billing calculation:**
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/keys` | GET | List user's API keys |
+| `/api/keys` | POST | Create new API key |
+| `/api/keys/[id]` | DELETE | Revoke API key |
 
-```
-cost = (prompt_tokens * input_price + completion_tokens * output_price) / 1_000_000
-```
+### Usage & Billing
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/usage` | GET | Get usage statistics |
+| `/api/billing` | GET | Get billing info |
+| `/api/billing/add-credits` | POST | Add credits (admin) |
 
 ---
 
 ## Security
 
-1. **API Key Security**
-   - Keys hashed with SHA-256 before storage
-   - Full key shown only once at creation
-   - Keys can be revoked instantly
+### API Key Security
+- Keys hashed with SHA-256 before storage
+- Full key shown only once at creation
+- Keys can be revoked instantly
+- Format: `dos_sk_<32 random chars>`
 
-2. **Rate Limiting** (optional)
-   - Per-key rate limits using Cloudflare KV
-   - Default: 100 requests/minute
+### Tunnel Security
+- Cloudflare Tunnel handles TLS termination
+- No exposed ports on local machine
+- Token-based authentication to Cloudflare
 
-3. **Request Validation**
-   - Validate JSON body
-   - Max request size
-   - Timeout handling
+### Rate Limiting
+- Per-key rate limits configurable
+- Default: 100 requests/minute
+- Uses D1 for counter storage
 
 ---
 
-## Implementation Phases
+## Operational Runbook
 
-### Phase 1: MVP (Week 1)
-- [ ] Create D1 database with schema
-- [ ] Deploy Cloudflare Worker (basic auth + forwarding)
-- [ ] API routes for key management
-- [ ] Simple API Keys page in dashboard
+### Check Tunnel Status
 
-### Phase 2: Usage Tracking (Week 2)
-- [ ] Log all requests to D1
-- [ ] Usage API endpoint
-- [ ] Usage dashboard page with charts
+```powershell
+# Check service status
+Get-Service cloudflared
 
-### Phase 3: Polish (Week 3)
-- [ ] Rate limiting
-- [ ] Better error handling
-- [ ] API documentation page
-- [ ] SDK examples (Python, Node.js)
+# View recent logs
+Get-EventLog -LogName Application -Source cloudflared -Newest 10
 
-### Phase 4: Billing (Future)
-- [ ] Stripe integration
-- [ ] Prepaid credits system
-- [ ] Usage alerts
+# Test endpoint
+curl https://inference.dos.ai/health
+```
+
+### Restart Tunnel
+
+```powershell
+# Force kill and restart (safe)
+Get-Process cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 3
+Start-Service cloudflared
+
+# Wait for connection (QUIC timeout can take 2 min)
+Start-Sleep -Seconds 30
+curl https://inference.dos.ai/health
+```
+
+### Check User Balance
+
+```bash
+# Via Wrangler
+wrangler d1 execute dos-inference --command="SELECT * FROM billing WHERE user_id = 'xxx'"
+```
+
+### Add Credits
+
+```bash
+# Add $100 credit (10000 cents)
+wrangler d1 execute dos-inference --command="UPDATE billing SET balance_cents = balance_cents + 10000 WHERE user_id = 'xxx'"
+```
 
 ---
 
@@ -602,43 +375,28 @@ cost = (prompt_tokens * input_price + completion_tokens * output_price) / 1_000_
 packages/
 └── api-gateway/
     ├── src/
-    │   └── worker.ts
-    ├── wrangler.toml
+    │   └── worker.ts          # Main Worker with billing logic
+    ├── wrangler.toml          # D1 bindings, env vars
     └── package.json
 
 apps/app/src/
 ├── app/
 │   ├── api/
-│   │   ├── keys/
-│   │   │   ├── route.ts
-│   │   │   └── [id]/route.ts
-│   │   └── usage/
-│   │       └── route.ts
+│   │   ├── keys/              # API key management
+│   │   ├── usage/             # Usage statistics
+│   │   └── billing/           # Billing endpoints
 │   ├── api-keys/
-│   │   └── page.tsx
+│   │   └── page.tsx           # API Keys UI
 │   └── usage/
-│       └── page.tsx
+│       └── page.tsx           # Usage dashboard
 └── lib/
-    └── cloudflare.ts     # D1 client helper
+    └── cloudflare.ts          # D1 client helper
 
-```
-
----
-
-## Commands
-
-```bash
-# Create D1 database
-wrangler d1 create dos-inference
-
-# Run migrations
-wrangler d1 execute dos-inference --file=./schema.sql
-
-# Deploy worker
-cd packages/api-gateway && wrangler deploy
-
-# Local development
-wrangler dev
+C:\Users\JOY\.cloudflared\
+├── 04915ff2-6f0d-49ab-8115-c36c74edbff9.json  # Tunnel credentials
+├── ai-api-config.yml                           # Tunnel config (if using config file)
+├── fix-and-install-service.ps1                 # Service installation script
+└── force-restart-service.ps1                   # Service restart script
 ```
 
 ---
@@ -647,5 +405,7 @@ wrangler dev
 
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/)
 - [Cloudflare D1](https://developers.cloudflare.com/d1/)
+- [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 - [vLLM OpenAI Server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html)
 - [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
+- [BILLING-MIGRATION-ROADMAP.md](./BILLING-MIGRATION-ROADMAP.md) - Plan to migrate billing to Supabase
