@@ -4,6 +4,128 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### 2026-02-07 - Schema Reorganization, Models & User Settings
+
+#### Added
+- **`dosai.models` table**: Merged `model_pricing` into full model info table with provider, description, context_length, capabilities (JSONB), plus pricing columns
+- **`dosai.user_settings` table**: Per-user DOS.AI preferences (default_model, billing_alerts JSONB, api_preferences JSONB) with RLS policies
+
+#### Changed
+- **Supabase schema reorganization**: Moved DOS.AI-specific tables to `dosai` schema
+  - `usage_transactions` → `dosai.usage_transactions`
+  - `model_pricing` → `dosai.models` (merged with full model info)
+  - Shared tables (`billing_accounts`, `credit_transactions`) remain in `public`
+- **PostgREST config**: Exposed `dosai` schema (`ALTER ROLE authenticator SET pgrst.db_schemas`)
+- **Worker Supabase client**: Added schema support via `Content-Profile`/`Accept-Profile` headers
+- **Updated docs**: `INFERENCE-API-ARCHITECTURE.md` rewritten to reflect current state
+
+#### Fixed
+- `credit_transactions.amount_cents` changed from INTEGER to NUMERIC(20,4)
+
+#### dosai Schema (Final State)
+| Table | Description |
+|-------|-------------|
+| `dosai.models` | Model info + pricing (7 models) |
+| `dosai.usage_transactions` | Per-request usage logs |
+| `dosai.user_settings` | User preferences |
+
+#### Files Modified
+- `packages/api-gateway/src/worker.ts` - Schema-aware Supabase REST client
+- `docs/INFERENCE-API-ARCHITECTURE.md` - Full rewrite
+- `CLAUDE.md` - Added Supabase Schema Layout section
+
+---
+
+### 2026-01-31 - UI Improvements & Settings Reorganization
+
+#### Added
+- **Theme and Language settings** moved to Settings page (`/settings`)
+  - New `ThemeSelect` component
+  - New `LanguageSelect` component in Settings form
+- **Organization logo upload** on Settings page
+
+#### Changed
+- **Account dropdown menu** simplified: removed theme/language selectors, kept Account, Privacy, Feedback, Logout
+
+#### Fixed
+- **Favicon margins**: Deleted `icon.png` so Next.js uses `icon.svg` (full SVG without margins)
+- **Select dropdown dark mode flash**: Changed from `bg-transparent` to explicit `bg-white dark:bg-zinc-800`
+
+#### Commits
+- `8ef990d` - fix: Remove icon.png to use full SVG favicon without margins
+- `8c8d8cf` - feat: Move theme and language settings to Settings page
+- `d1e3b7e` - fix: Select dropdown dark mode flash
+
+---
+
+### 2026-01-30 - Session Persistence & Billing Precision
+
+#### Fixed
+- **Session logout after ~1 hour**: Supabase access_token expires in ~1h but cookie TTL was 14 days
+  - Implemented automatic token refresh in `/api/auth/verify-session` using `refresh_token`
+  - Removed `expires_at` check from `auth-server.ts`
+  - Cookie updated with refreshed tokens when needed
+- **Billing 100x overcharge**: `Math.ceil` with `*100/100` rounded 0.00009 up to 0.01 cents per component
+  - Removed `Math.ceil`, using exact calculation with 4 decimal precision
+  - Removed minimum 1 cent charge
+- **Differentiated input/output pricing**: Output tokens now priced higher than input (industry standard)
+
+#### Model Pricing Update (D1)
+| Model | Input ¢/1M | Output ¢/1M |
+|-------|-----------|------------|
+| Llama 3.1 8B | 10 | 20 |
+| Llama 3.1 70B | 50 | 150 |
+| Llama 3.3 70B | 60 | 180 |
+| Qwen 2.5 72B | 50 | 150 |
+| DeepSeek V3 | 27 | 110 |
+| Qwen3 VL 30B | 10 | 80 |
+
+#### Commits
+- `a32a30d` - fix: Token refresh and billing precision fixes
+- `6bf6531` - docs: Add MCP Playwright testing reminder to CLAUDE.md
+
+---
+
+### 2026-01-29 - Billing Migration to Supabase
+
+#### Added
+- **Supabase billing tables**: `billing_accounts`, `usage_transactions`, `credit_transactions`, `model_pricing`
+- **Dual-write**: Worker writes billing data to both D1 and Supabase
+- **Migration complete**: Supabase is now single source of truth for billing
+
+#### Commits
+- `f567699` - feat: Add billing dual-write to Supabase
+
+---
+
+### 2026-01-16 - Supabase Auth Migration & Account Features
+
+#### Added
+- **Avatar upload** with Supabase Storage (Assets bucket)
+- **Organization update API** (`PATCH /api/orgs/:id`)
+- **Account page** with profile editing and identity mapping
+
+#### Changed
+- **Auth migrated from Firebase to Supabase**: password, logout, identity APIs
+- **Organization creation** now uses Supabase Auth
+- **Server-side RLS** with JWT Authorization header
+
+#### Fixed
+- OAuth callback `/login` flash: use server-side redirect
+- RLS permission issues: multiple iterations to get correct auth pattern
+- DOS-Me API sync: removed incorrect `provider` field from `checkLogin`
+
+#### Commits
+- `9221f91` - feat: Add avatar upload and fix profile updates
+- `56ddfed` - fix: Complete account page functionality and identity mapping
+- `cec717d` - fix: Complete Firebase → Supabase migration for auth flows
+- `ef854bd` - feat: Add organization update API endpoint
+- `a08a10a` - fix: Migrate auth APIs to Supabase (password, logout, identity)
+- `e7af5a9` - fix: Complete organization creation with Supabase Auth
+- `40f608d` - fix: Use server-side redirect in OAuth callback to avoid /login flash
+
+---
+
 ### 2024-12-20 - Server-Side OAuth Implementation
 
 #### Added

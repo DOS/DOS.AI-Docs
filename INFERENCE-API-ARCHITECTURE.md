@@ -4,7 +4,7 @@
 
 This document describes the architecture for DOS.ai Serverless Inference API, allowing users to access LLM models via OpenAI-compatible API with API key authentication and usage-based billing.
 
-## Current Infrastructure (January 2025)
+## Current Infrastructure (February 2026)
 
 ### Components
 
@@ -13,9 +13,58 @@ This document describes the architecture for DOS.ai Serverless Inference API, al
 | **vLLM Server** | Local PC (localhost:8000) | Docker container running LLM models with GPU |
 | **Cloudflare Tunnel** | cloudflared service | Exposes local vLLM at `inference.dos.ai` |
 | **API Gateway** | Cloudflare Worker | `api.dos.ai` - Auth, billing, rate limiting |
-| **D1 Database** | Cloudflare Edge | API keys, billing balances, usage logs |
-| **Supabase** | PostgreSQL | Users, orgs, Stripe customers, payments |
+| **D1 Database** | Cloudflare Edge | API keys, rate limiting, model pricing (edge-fast) |
+| **Supabase** | PostgreSQL | Billing accounts, usage logs (single source of truth) |
 | **Dashboard** | Vercel (apps/app) | `app.dos.ai` - User management |
+
+### Database Architecture
+
+```
+┌─ Supabase (PostgreSQL) ─────────────────────────────────────────┐
+│                                                                  │
+│  public schema (DOS-Me platform, shared across all products)     │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ auth.users           │ profiles          │ organizations │   │
+│  │ billing_accounts ◄───┼── Balance R/W (single source)     │   │
+│  │ credit_transactions  │── Deposits/refunds                │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  dosai schema (DOS.AI-specific data)                             │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ models             ◄─┼── Model info + pricing reference    │   │
+│  │ usage_transactions ◄─┼── Per-request usage logs           │   │
+│  │ user_settings      ◄─┼── User preferences (default model) │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ Cloudflare D1 (Edge) ──────────────────────────────────────────┐
+│  api_keys          ◄── API key validation (every request)        │
+│  rate_limit_log    ◄── Rate limiting                             │
+│  model_pricing     ◄── Pricing cache (sub-ms reads)              │
+│  usage_transactions◄── Dashboard usage queries                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Schema rule**: Product-specific data goes in its own schema (e.g., `dosai`), NOT in `public`. Shared platform data stays in `public`.
+
+**PostgREST config**: Exposed schemas = `public, graphql_public, dosai`
+
+### Pricing Table
+
+Prices in USD cents per 1M tokens. DOS.AI prices at ~50% of provider rates.
+
+| Model | Model ID | Input ¢/1M | Output ¢/1M |
+|-------|----------|-----------|------------|
+| Llama 3.1 8B | `llama-3.1-8b` | 10 | 20 |
+| Llama 3.1 70B | `llama-3.1-70b` | 50 | 150 |
+| Llama 3.3 70B | `llama-3.3-70b` | 60 | 180 |
+| Qwen 2.5 72B | `qwen-2.5-72b` | 50 | 150 |
+| DeepSeek V3 | `deepseek-v3` | 27 | 110 |
+| Qwen3 VL 30B | `qwen3-vl-30b` | 10 | 80 |
+| Default | `default` | 10 | 10 |
+
+Pricing stored in **D1 `model_pricing`** (read at edge for billing) and **Supabase `dosai.models`** (source of truth with full model info). Worker reads from D1 for sub-ms latency.
 
 ### Tunnel Configuration
 
@@ -48,19 +97,18 @@ Start-Service cloudflared
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Bexly/Apps    │────▶│ api.dos.ai      │────▶│ inference.dos.ai│────▶│  vLLM (Local)   │
-│   (API Client)  │     │ (CF Worker)     │     │ (CF Tunnel)     │     │  localhost:8000 │
+│   (API Client)  │     │ (CF Worker)     │     │ (CF Tunnel)     │     │  localhost:8000  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
                                │
-                               ▼
-                        ┌─────────────────┐
-                        │  Cloudflare D1  │
-                        │  (Keys, Billing)│
-                        └─────────────────┘
-                               │
-                               │ (Future: migrate billing)
-                               ▼
+                        ┌──────┴──────┐
+                        ▼             ▼
+                  ┌──────────┐  ┌──────────┐
+                  │    D1    │  │ Supabase │
+                  │ (Edge)   │  │ (Billing)│
+                  └──────────┘  └──────────┘
+
 ┌─────────────────┐     ┌─────────────────┐
-│   User          │────▶│  Dashboard      │────▶ Supabase (Users, Orgs, Stripe)
+│   User          │────▶│  Dashboard      │────▶ Supabase (Users, Orgs, Billing)
 │   (Browser)     │     │  app.dos.ai     │
 └─────────────────┘     └─────────────────┘
 ```
@@ -76,7 +124,7 @@ Start-Service cloudflared
    a. Extract API key from Authorization header
    b. Hash key with SHA-256
    c. Query D1 to validate key and get user_id
-   d. Check billing balance (must have sufficient credits)
+   d. Check Supabase billing_accounts balance
    e. If insufficient balance → 402 Payment Required
 
 3. Forward to inference backend
@@ -89,135 +137,94 @@ Start-Service cloudflared
 5. vLLM processes and returns response
    - Includes usage: { prompt_tokens, completion_tokens, total_tokens }
 
-6. Worker calculates and deducts cost
-   - Get model pricing from D1.model_pricing table
-   - Calculate: cost = (tokens / 1M) × price_per_million
-   - Apply minimum charge of $0.01
-   - Deduct from D1.billing.balance_cents
-   - Log transaction to D1.usage_transactions
+6. Worker calculates and deducts cost (async, non-blocking)
+   - Get model pricing from D1.model_pricing (edge-fast)
+   - Calculate: cost = (tokens / 1,000,000) × price_per_million
+   - Exact precision: 4 decimal places (0.0001 cents), no minimum charge
+   - Deduct from Supabase public.billing_accounts
+   - Log transaction to Supabase dosai.usage_transactions
 
 7. Return response to client
 ```
 
 ---
 
-## Billing System (Current State)
+## Billing System
 
 ### Token-Based Billing Flow
 
 Located in `packages/api-gateway/src/worker.ts`:
 
 ```typescript
+// Supabase is single source of truth for billing
 async function deductBalance(
   db: D1Database,
+  supabase: SupabaseClient | null,
   userId: string,
   apiKeyId: string,
   model: string,
   inputTokens: number,
   outputTokens: number
-): Promise<{ success: boolean; newBalance?: number; error?: string }> {
-  // Get model pricing from D1
+): Promise<void> {
+  // Get model pricing from D1 (edge-fast, sub-ms)
   const pricing = await db.prepare(
     'SELECT input_price_per_million, output_price_per_million FROM model_pricing WHERE model_id = ?'
   ).bind(model).first();
 
-  // Default pricing if model not in table
-  const inputPricePerMillion = pricing?.input_price_per_million || 10;   // $0.10/1M
-  const outputPricePerMillion = pricing?.output_price_per_million || 10; // $0.10/1M
+  const inputPricePerMillion = pricing?.input_price_per_million || 10;
+  const outputPricePerMillion = pricing?.output_price_per_million || 10;
 
-  // Calculate cost in cents
-  const inputCostCents = Math.ceil((inputTokens / 1_000_000) * inputPricePerMillion * 100) / 100;
-  const outputCostCents = Math.ceil((outputTokens / 1_000_000) * outputPricePerMillion * 100) / 100;
+  // Calculate cost in cents (exact - no rounding until final)
+  const inputCostCents = (inputTokens / 1_000_000) * inputPricePerMillion;
+  const outputCostCents = (outputTokens / 1_000_000) * outputPricePerMillion;
   const totalCostCents = inputCostCents + outputCostCents;
 
-  // Minimum charge: 1 cent
-  const finalCostCents = Math.max(1, Math.round(totalCostCents * 100) / 100);
+  // Skip if cost is essentially zero
+  if (totalCostCents < 0.00001) return;
 
-  // Deduct from balance
-  const result = await db.prepare(`
-    UPDATE billing
-    SET balance_cents = balance_cents - ?, updated_at = datetime('now')
-    WHERE user_id = ? AND balance_cents >= ?
-  `).bind(finalCostCents, userId, finalCostCents).run();
+  // Round to 4 decimal places for storage (0.0001 cents precision)
+  const costInCentsRounded = Math.round(totalCostCents * 10000) / 10000;
 
-  if (result.changes === 0) {
-    return { success: false, error: 'Insufficient balance' };
-  }
+  // ===== SUPABASE WRITE (single source of truth) =====
+  // Update billing_accounts in public schema
+  await supabase.from('billing_accounts').eq('user_id', userId).update({
+    balance_cents: currentBalance - costInCentsRounded,
+    total_spent_cents: currentSpent + costInCentsRounded,
+    lifetime_tokens_used: currentTokens + inputTokens + outputTokens,
+  });
 
-  // Log the transaction
-  await db.prepare(`
-    INSERT INTO usage_transactions
-    (user_id, api_key_id, model, input_tokens, output_tokens, cost_cents, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-  `).bind(userId, apiKeyId, model, inputTokens, outputTokens, finalCostCents).run();
-
-  return { success: true };
+  // Log usage to dosai schema
+  await supabase.from('usage_transactions', 'dosai').insert({
+    user_id: userId,
+    api_key_id: apiKeyId,
+    model, input_tokens: inputTokens, output_tokens: outputTokens,
+    input_cost_cents: inputCostRounded,
+    output_cost_cents: outputCostRounded,
+    total_cost_cents: costInCentsRounded,
+  });
 }
 ```
 
-### Pricing Table
+**Key design decisions:**
+- **No minimum charge**: Exact per-token pricing with 4 decimal precision
+- **Pricing from D1**: Sub-ms reads for every API request
+- **Billing writes to Supabase**: Single source of truth, NUMERIC(20,4) columns
+- **Usage logs to `dosai` schema**: Product-specific data separated from platform
+- **Worker uses custom REST client**: CF Workers can't use npm Supabase SDK, uses `Content-Profile: dosai` header for dosai schema
 
-| Model | Input (per 1M tokens) | Output (per 1M tokens) |
-|-------|----------------------|------------------------|
-| Llama 3.3 70B | $0.20 | $0.20 |
-| Llama 3.1 8B | $0.05 | $0.05 |
-| Qwen 2.5 72B | $0.25 | $0.25 |
-| Default | $0.10 | $0.10 |
+### Adding Credits
 
-### Adding Credits (Admin Only)
-
-Via Wrangler CLI:
 ```bash
-# Find user_id from Supabase by email
-# Then update D1 directly:
-wrangler d1 execute dos-inference --command="UPDATE billing SET balance_cents = balance_cents + 100000 WHERE user_id = 'xxx'"
-# 100000 cents = $1000
+# Via Supabase SQL editor or dashboard API:
+UPDATE public.billing_accounts
+SET balance_cents = balance_cents + 10000,
+    total_deposited_cents = total_deposited_cents + 10000
+WHERE user_id = '<user-uuid>';
+
+# Also log the credit transaction:
+INSERT INTO public.credit_transactions (user_id, amount_cents, type, description)
+VALUES ('<user-uuid>', 10000, 'deposit', 'Manual credit addition');
 ```
-
----
-
-## Database Architecture (Hybrid)
-
-### Cloudflare D1 (Edge-Optimized)
-
-**Purpose**: Low-latency operations at the edge (API key validation, balance checks, usage logging)
-
-**Tables**:
-- `api_keys` - API key storage with SHA-256 hashes
-- `billing` - User balance in cents
-- `usage_transactions` - Per-request usage logs
-- `usage_logs` - Legacy usage tracking
-- `model_pricing` - Per-model pricing configuration
-
-**Why D1**:
-- Sub-millisecond latency at edge
-- Co-located with API Gateway Worker
-- Handles high-frequency reads (every API request)
-
-### Supabase (PostgreSQL)
-
-**Purpose**: Business data, authentication, Stripe integration
-
-**Tables**:
-- `auth.users` - Supabase Auth users
-- `public.organizations` - User organizations
-- `public.organization_members` - Org membership
-- `public.stripe_customers` - Stripe customer IDs
-- `public.payment_transactions` - Payment history
-- `public.subscription_plans` - Available plans
-
-**Why Supabase**:
-- Row-level security (RLS) for multi-tenant data
-- Direct Stripe webhook integration
-- Full-featured PostgreSQL for complex queries
-- Already handles auth and user management
-
-### Future Migration
-
-See [BILLING-MIGRATION-ROADMAP.md](./BILLING-MIGRATION-ROADMAP.md) for the plan to:
-1. Keep API keys and rate limiting in D1 (edge-fast)
-2. Migrate billing/credits to Supabase (single source of truth)
-3. Remove duplicate data and inconsistency risk
 
 ---
 
@@ -299,9 +306,16 @@ curl https://api.dos.ai/v1/chat/completions \
 
 | Route | Method | Description |
 |-------|--------|-------------|
-| `/api/usage` | GET | Get usage statistics |
-| `/api/billing` | GET | Get billing info |
-| `/api/billing/add-credits` | POST | Add credits (admin) |
+| `/api/billing` | GET | Get billing info (from Supabase) |
+| `/api/billing/transactions` | GET | Get credit transactions |
+
+### Dashboard Endpoints (via Worker)
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/dashboard/billing/usage` | GET | Usage stats (from D1) |
+| `/dashboard/billing/add-credits` | POST | Add credits (admin) |
+| `/dashboard/models/pricing` | GET | Model pricing (from D1) |
 
 ---
 
@@ -355,16 +369,32 @@ curl https://inference.dos.ai/health
 
 ### Check User Balance
 
-```bash
-# Via Wrangler
-wrangler d1 execute dos-inference --command="SELECT * FROM billing WHERE user_id = 'xxx'"
+```sql
+-- Via Supabase SQL editor
+SELECT ba.*, au.email
+FROM public.billing_accounts ba
+JOIN auth.users au ON au.id = ba.user_id
+WHERE au.email = 'user@example.com';
 ```
 
-### Add Credits
+### Find User ID by Email
 
-```bash
-# Add $100 credit (10000 cents)
-wrangler d1 execute dos-inference --command="UPDATE billing SET balance_cents = balance_cents + 10000 WHERE user_id = 'xxx'"
+```sql
+-- Supabase SQL editor
+SELECT id, email FROM auth.users WHERE email = 'user@example.com';
+```
+
+### Update Model Pricing
+
+```sql
+-- Update in Supabase (dosai.models - source of truth)
+UPDATE dosai.models
+SET input_price_per_million = 50, output_price_per_million = 150, updated_at = NOW()
+WHERE model_id = 'llama-3.1-70b';
+
+-- Also update D1 (edge pricing cache - worker reads from here)
+-- cd packages/api-gateway
+-- npx wrangler d1 execute dos-api --remote --command="UPDATE model_pricing SET input_price_per_million = 50, output_price_per_million = 150 WHERE model_id = 'llama-3.1-70b'"
 ```
 
 ---
@@ -376,25 +406,26 @@ packages/
 └── api-gateway/
     ├── src/
     │   └── worker.ts          # Main Worker with billing logic
+    ├── migrations/             # D1 migration SQL files
     ├── wrangler.toml          # D1 bindings, env vars
     └── package.json
 
-apps/app/src/
-├── app/
+apps/app/
+├── src/app/
 │   ├── api/
 │   │   ├── keys/              # API key management
-│   │   ├── usage/             # Usage statistics
-│   │   └── billing/           # Billing endpoints
-│   ├── api-keys/
-│   │   └── page.tsx           # API Keys UI
-│   └── usage/
-│       └── page.tsx           # Usage dashboard
-└── lib/
-    └── cloudflare.ts          # D1 client helper
+│   │   └── billing/           # Billing endpoints (reads Supabase)
+│   ├── (app)/
+│   │   ├── api-keys/          # API Keys UI
+│   │   ├── usage/             # Usage dashboard
+│   │   └── billing/           # Billing UI
+│   └── ...
+├── supabase/
+│   └── migrations/            # Supabase migration SQL files
+└── ...
 
 C:\Users\JOY\.cloudflared\
 ├── 04915ff2-6f0d-49ab-8115-c36c74edbff9.json  # Tunnel credentials
-├── ai-api-config.yml                           # Tunnel config (if using config file)
 ├── fix-and-install-service.ps1                 # Service installation script
 └── force-restart-service.ps1                   # Service restart script
 ```
@@ -408,4 +439,4 @@ C:\Users\JOY\.cloudflared\
 - [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 - [vLLM OpenAI Server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html)
 - [OpenAI API Reference](https://platform.openai.com/docs/api-reference)
-- [BILLING-MIGRATION-ROADMAP.md](./BILLING-MIGRATION-ROADMAP.md) - Plan to migrate billing to Supabase
+- [Supabase Custom Schemas](https://supabase.com/docs/guides/api/using-custom-schemas)
