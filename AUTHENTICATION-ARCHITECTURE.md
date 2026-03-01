@@ -388,22 +388,72 @@ const decodedClaims = await adminAuth.verifySessionCookie(
 )
 ```
 
+## SSO via DOS ID (id.dos.me)
+
+DOS.AI supports centralized Single Sign-On through `id.dos.me`, the identity hub for the DOS ecosystem. All DOS products (dos.me, dos.ai, dosafe.io, metados.com, bexly.app) share the same Supabase Auth project.
+
+### How It Works
+
+```
+┌─────────────┐    ┌─────────────┐    ┌──────────┐    ┌──────────┐
+│  app.dos.ai │───▶│  id.dos.me  │───▶│ Supabase │───▶│ Provider │
+│  (no auth)  │    │   /login    │    │   Auth   │    │ (Google) │
+└─────────────┘    └─────────────┘    └──────────┘    └──────────┘
+      │                  │                  │               │
+      │  ?redirect=      │                  │               │
+      │  app.dos.ai/     │                  │◀── session ──│
+      │  auth/sso        │                  │               │
+      │                  │◀── session ──────│               │
+      │                  │                  │               │
+      │◀── redirect with tokens (hash) ────│               │
+      │                  │                  │               │
+      ▼                  │                  │               │
+┌─────────────┐
+│  /auth/sso  │
+│  #tokens    │
+│  → cookie   │
+│  → dashboard│
+└─────────────┘
+```
+
+### Flow Details
+
+1. App redirects to `https://id.dos.me/login?redirect=https://app.dos.ai/auth/sso`
+2. `id.dos.me` stores redirect URL in `sso_redirect` cookie
+3. User authenticates via Supabase (Google, GitHub, Discord, etc.)
+4. id.dos.me callback checks `sso_redirect` cookie
+5. Redirects to `https://app.dos.ai/auth/sso#access_token=xxx&refresh_token=xxx&token_type=bearer`
+6. Client-side `/auth/sso` page reads hash fragment, validates via `supabase.auth.setSession()`
+7. Creates httpOnly session cookie via `/api/auth/session`
+8. Cleans URL with `history.replaceState()`, redirects to dashboard
+
+### Security
+
+- **Tokens in hash fragment**: Not sent to server, not logged in server access logs
+- **URL cleaned immediately**: `replaceState()` removes tokens from browser history
+- **Redirect whitelist**: id.dos.me only redirects to whitelisted domains (dos.ai, app.dos.ai, etc.)
+- **Same Supabase project**: All DOS products share the same auth backend, tokens valid across apps
+
+### When SSO Is Used
+
+- Cross-product navigation (user logged into dos.me, clicks link to dos.ai)
+- Centralized login page for all DOS products
+- Mobile app deep links that need web authentication
+
+### Direct Login (Alternative)
+
+DOS.AI also supports direct OAuth login (Google, GitHub) via `/api/auth/google/start` for users who only use DOS.AI. This provides faster UX by skipping the id.dos.me redirect.
+
+---
+
 ## Future Enhancements
 
-### 1. Multi-App SSO (DOS ID)
-- Shared authentication across dos.ai, app.dos.ai, admin.dos.ai
-- Similar to EA ID / Blizzard ID
-- Options:
-  - Google Identity Platform (multi-tenancy)
-  - Supabase Auth (open-source alternative)
-  - Custom OAuth provider
-
-### 2. Additional OAuth Providers
-- GitHub (already implemented, needs testing)
+### 1. Additional OAuth Providers
 - Microsoft
 - Apple
+- Discord (via SSO from id.dos.me)
 
-### 3. Session Management
+### 2. Session Management
 - Session activity tracking
 - Multiple device management
 - Force logout on password change
