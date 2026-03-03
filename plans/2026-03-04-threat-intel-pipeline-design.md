@@ -226,6 +226,31 @@ No changes needed — bot calls same API endpoints. Richer data flows through au
 | Duplicate entries | UNIQUE(entity_hash, source) — ON CONFLICT UPDATE last_seen_at |
 | Expired cache | WHERE expires_at IS NULL OR expires_at > now() |
 
+## On-Chain Write Flow (Phase 2)
+
+Reference: [DOSafe Entity Flag Integration Spec](../../integration/dosafe-entity-flag-integration.md)
+
+When user reports are reviewed and confirmed, write attestation on-chain via DOSAttester:
+
+```
+User report → DB (risk_score: 50) → Admin/LLM review → Confirmed?
+  → YES: Write EAS attestation on-chain (DOSAttester contract)
+  → NO: Mark as disputed in DB
+```
+
+**Requirements**:
+- DOSAttester: `0x3939CA17770F058A01b50793Fa29f9A8a4FFA77E`
+- Need `ATTESTER_ROLE` on DOSAttester contract
+- Env: `ATTESTER_PRIVATE_KEY=0x...`
+- Flow: DB first, chain second — never write unverified reports on-chain
+
+**Entity ID normalization (per DOS Chain spec)**:
+- domain: lowercase, strip `www.`
+- url: lowercase scheme+host, strip tracking params, strip trailing `/`
+- phone: E.164 format (`+84909123456`)
+- email: lowercase
+- bank_account: `BANK_CODE:ACCOUNT_NUMBER` (e.g. `VCB:1234567890`)
+
 ## Key Design Decisions
 
 1. **Single unified table** over per-source tables — simpler queries, easier to add sources, adequate for 100k-200k rows
