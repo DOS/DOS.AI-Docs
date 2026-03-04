@@ -197,7 +197,7 @@ Quota: 20 checks/day per chat
 Detailed in [threat-intel.md](threat-intel.md).
 
 **Summary:**
-- **255k+ entries** from MetaMask (233k domains), URLhaus (22k URLs), OpenPhish (300 URLs)
+- **636k+ entries** from ScamSniffer (343k domains + 2.5k wallets), MetaMask (233k domains), ChongLuaDao (34k domains, static), URLhaus (22k URLs), OpenPhish (300 URLs)
 - **Schema:** `dosafe.threat_intel` in `dosafe` schema (separate from `public`)
 - **Sync:** Edge Function via pg_cron every 6 hours, DB-side SHA-256 hashing
 - **Lookup:** Hash entity value → query `entity_hash` index → aggregate multi-source signals
@@ -225,7 +225,7 @@ Other products (Rate.Box, Bexly) call `api.dos.me/trust/check` — they never qu
 
 | Table | Schema | Purpose |
 |-------|--------|---------|
-| `threat_intel` | dosafe | Unified threat data (255k+ entries) |
+| `threat_intel` | dosafe | Unified threat data (636k+ entries) |
 | `threat_clusters` | dosafe | Scammer group linking |
 | `sync_log` | dosafe | Sync health monitoring |
 | `bot_quota` | public | Telegram bot daily limits |
@@ -313,7 +313,7 @@ DOSAFE_API_URL=https://dosafe.io
 - [x] URL/domain scam check with on-chain integration
 - [x] Telegram bot with bilingual support
 - [x] Chrome extension
-- [x] Threat intelligence pipeline (255k+ entries, 6h sync)
+- [x] Threat intelligence pipeline (636k+ entries, 6h sync)
 - [x] Quota system (anonymous + authenticated)
 
 ### In Progress
@@ -324,6 +324,7 @@ DOSAFE_API_URL=https://dosafe.io
 - [ ] User report command (/report) with LLM entity extraction
 - [ ] Entity clustering (auto-link related scammer identities)
 - [ ] Sync confirmed flags to DOS.Me Trust API
+- [ ] Caller ID / spam phone lookup (iCallMe-like feature)
 - [ ] Audio detection pipeline (TTS/voice cloning)
 - [ ] Video detection pipeline (deepfake)
-- [ ] Vietnamese-specific threat sources (chongluadao.vn)
+- [ ] Vietnamese-specific threat sources (kiemtraluadao.vn, checkscam.vn)

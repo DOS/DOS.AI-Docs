@@ -8,7 +8,8 @@
 DOSafe aggregates threat data from multiple external sources into a unified Supabase database (`dosafe.threat_intel`), enabling instant DB-first lookups for URL/phone/entity scam checks with runtime fallback and automatic caching.
 
 **Key stats:**
-- **255,000+ entries** from 3 sources (MetaMask, URLhaus, OpenPhish)
+- **636,000+ entries** from 5 sources (ScamSniffer, MetaMask, ChongLuaDao, URLhaus, OpenPhish)
+- **Entity types:** domains (611k), URLs (22k), wallets (2.5k)
 - **Sync cadence:** Every 6 hours via pg_cron → Edge Function
 - **Lookup speed:** <10ms (SHA-256 hash index)
 
@@ -19,6 +20,7 @@ DOSafe aggregates threat data from multiple external sources into a unified Supa
 │                    DATA INGESTION                            │
 │                                                              │
 │  pg_cron (every 6h) → Edge Function: sync-threats            │
+│                        ├── ScamSniffer scam-db (343k+2.5k)  │
 │                        ├── MetaMask eth-phishing (233k)      │
 │                        ├── URLhaus abuse.ch (22k)            │
 │                        ├── OpenPhish community (300)         │
@@ -145,7 +147,9 @@ Monitoring table for sync health.
 
 | Source | Type | Size | Sync | Mapping |
 |--------|------|------|------|---------|
+| ScamSniffer scam-database | GitHub JSON | 343k domains + 2.5k wallets | Full replace / 6h | `domain`/`wallet`, `scam`, risk 85 |
 | MetaMask eth-phishing-detect | GitHub JSON | 233k domains | Full replace / 6h | `domain`, `phishing`, risk 90 |
+| ChongLuaDao blocklist | GitHub JSON | 34k domains (static) | One-time import | `domain`, `phishing`, risk 85 |
 | URLhaus (abuse.ch) | Text feed | 22k URLs | Upsert / 6h | `url`, `malware`, risk 85 |
 | OpenPhish community | Text feed | 300 URLs | Full replace / 6h | `url`, `phishing`, risk 80 |
 | Runtime cache | Auto-generated | Growing | On each check | Various, risk varies, 7-day TTL |
@@ -157,7 +161,8 @@ Monitoring table for sync health.
 | DOS Chain on-chain | EAS attestations | Incremental sync of Schema 6 attestations |
 | User reports | Telegram bot / Web | `/report` command, LLM entity extraction, initial risk 50 |
 | PhishStats | CSV API | ~5k URLs/day, free |
-| chongluadao.vn | Vietnamese-specific | Community scam reports |
+| kiemtraluadao.vn | Vietnamese scam checker | Investigating API access |
+| checkscam.vn | Vietnamese scam checker | Investigating API access |
 
 ## Sync Infrastructure
 
@@ -201,7 +206,9 @@ The Edge Function is deployed with `--no-verify-jwt`, so any Bearer token works 
 | OpenPhish | 300 | ~1s |
 | URLhaus | 22k | ~5s |
 | MetaMask | 233k | ~37s |
-| **Total** | **255k** | **~43s** |
+| ScamSniffer domains | 343k | ~40s |
+| ScamSniffer wallets | 2.5k | ~1s |
+| **Total** | **~636k** | **~109s** |
 
 ## Check Flow Integration
 
