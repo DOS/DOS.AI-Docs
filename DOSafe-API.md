@@ -1,16 +1,16 @@
 # DOSafe API
 
-> **Base URL:** `https://app.dosafe.io/api/v1`
+> **Base URL:** `https://app.dosafe.io/api`
 >
-> **Auth:** All endpoints require `X-Api-Key` header. Contact DOSafe team to get a key.
+> **Auth:** All endpoints require `X-Api-Key` header. One key covers all DOSafe services.
 
 ---
 
 ## Overview
 
-The DOSafe API is the unified safety gateway for the DOS ecosystem. It aggregates threat intelligence from multiple independent sources and returns a weighted risk verdict for any entity.
+The DOSafe API is the unified safety gateway for the DOS ecosystem. A single API key grants access to all DOSafe services — entity/URL safety checks, AI text/image detection, and community reporting — with scopes controlling which capabilities are available.
 
-### Data Sources
+### Data Sources (Safety Check)
 
 | Source | Weight | Description |
 |--------|--------|-------------|
@@ -18,7 +18,7 @@ The DOSafe API is the unified safety gateway for the DOS ecosystem. It aggregate
 | DOS Chain | High | Immutable on-chain attestations via EAS |
 | DOS.Me Identity | Moderate | Member trust score, verified providers, flagged status |
 
-**Architecture:** DOSafe is the safety engine and public gateway. DOS.Me is an identity data provider — partners call DOSafe, not DOS.Me.
+**Architecture:** DOSafe is the safety engine and public gateway. DOS.Me is an identity data provider — external services call DOSafe, not DOS.Me.
 
 ### Risk Score → Level
 
@@ -40,6 +40,8 @@ Scores are computed by weighted aggregation of signals — no single source dete
 X-Api-Key: dsk_xxxx...
 ```
 
+Keys are stored as SHA-256 hashes in `dosafe.api_keys`. Plaintext is never persisted after provisioning.
+
 ### Scopes
 
 | Scope | Endpoints |
@@ -47,8 +49,11 @@ X-Api-Key: dsk_xxxx...
 | `check` | `POST /check` |
 | `bulk` | `POST /check/bulk` |
 | `report` | `POST /report` |
+| `detect` | `POST /detect`, `POST /detect-image` |
+| `url-check` | `POST /url-check` |
+| `entity-check` | `POST /entity-check` |
 
-Contact DOSafe team to provision a key with required scopes.
+A key can have multiple scopes. Contact the DOSafe team to provision a key with required scopes.
 
 ---
 
@@ -69,7 +74,9 @@ Contact DOSafe team to provision a key with required scopes.
 
 ---
 
-## Endpoints
+## Safety Check API
+
+Structured developer API. Cleaner response format optimized for machine consumption.
 
 ### `POST /check`
 
@@ -110,7 +117,7 @@ Single entity safety check. Runs DB lookup + on-chain query + DOS.Me identity in
 
 **Example — Bexly: check wallet before transaction:**
 ```typescript
-const res = await fetch('https://app.dosafe.io/api/v1/check', {
+const res = await fetch('https://app.dosafe.io/api/check', {
   method: 'POST',
   headers: {
     'X-Api-Key': process.env.DOSAFE_API_KEY,
@@ -132,7 +139,7 @@ if (result.flagged && result.riskLevel === 'critical') {
 
 **Scope:** `bulk`
 
-Batch entity check. Max 50 entities per request. Results are returned in the same order as input.
+Batch entity check. Max 50 entities per request. Results are returned in the same order as input. Individual errors do not fail the whole batch.
 
 **Request:**
 ```json
@@ -210,6 +217,112 @@ Submit a safety report for an entity. Reports are staged in `raw_imports` for re
 
 ---
 
+## AI Detection API
+
+### `POST /detect`
+
+**Scope:** `detect`
+
+AI text detection. Returns probability that the input was AI-generated.
+
+**Request:**
+```json
+{
+  "text": "The quick brown fox..."
+}
+```
+
+**Response:**
+```json
+{
+  "aiProbability": 87,
+  "verdict": "AI",
+  "confidence": "high",
+  "signals": {
+    "perplexity": 42.1,
+    "burstiness": 0.12,
+    "binoculars": 0.93,
+    "rubricScore": 81
+  }
+}
+```
+
+---
+
+### `POST /detect-image`
+
+**Scope:** `detect`
+
+AI image detection. Combines C2PA, EXIF/DCT metadata, reverse image search, and LLM visual analysis.
+
+**Request:** `multipart/form-data` with `image` field (JPEG/PNG/WEBP/GIF, ≤10MB), or JSON `{ "url": "..." }`.
+
+**Response:**
+```json
+{
+  "aiProbability": 92,
+  "verdict": "AI",
+  "confidence": "high",
+  "signals": {
+    "c2pa": "ai_generated",
+    "exif": "no_camera_metadata",
+    "reverseSearch": "not_found"
+  }
+}
+```
+
+---
+
+### `POST /url-check`
+
+**Scope:** `url-check`
+
+URL/domain safety check. DB lookup + runtime checks (Google Safe Browsing, WHOIS, on-chain).
+
+**Request:**
+```json
+{ "url": "https://evil.com/phish" }
+```
+
+**Response:**
+```json
+{
+  "url": "https://evil.com/phish",
+  "domain": "evil.com",
+  "riskLevel": "critical",
+  "riskScore": 95,
+  "signals": ["db_flagged_phishing", "domain_new_7d"],
+  "sources": ["phishing_database"]
+}
+```
+
+---
+
+### `POST /entity-check`
+
+**Scope:** `entity-check`
+
+Full entity risk check with raw DB entries and member data. Used internally by DOSafe clients (Telegram, mobile, extension).
+
+**Request:**
+```json
+{ "entityType": "phone", "entityId": "+84901234567" }
+```
+
+**Response:**
+```json
+{
+  "riskLevel": "high",
+  "riskScore": 78,
+  "riskSignals": ["db_flagged_scam", "db_source_checkscam_vn"],
+  "threatIntel": { "entries": [...] },
+  "onChain": { "attestationCount": 1, "latestRiskScore": 80 },
+  "trustedMember": { "found": true, "member": { "trustScore": 45, "isFlagged": false, "passingThreshold": false } }
+}
+```
+
+---
+
 ## Signal Reference
 
 Signals are the raw evidence contributing to a risk score. Returned in `signals[]` for transparency.
@@ -263,9 +376,9 @@ If you were previously using `api.dos.me/trust/check`, migrate to DOSafe:
 
 | Old | New |
 |-----|-----|
-| `POST api.dos.me/trust/check` | `POST app.dosafe.io/api/v1/check/bulk` |
-| `GET api.dos.me/trust/member` | Included in `/v1/check` response as `member` field |
-| `POST api.dos.me/trust/flags` | `POST app.dosafe.io/api/v1/report` |
+| `POST api.dos.me/trust/check` | `POST app.dosafe.io/api/check/bulk` |
+| `GET api.dos.me/trust/member` | Included in `/check` response as `member` field |
+| `POST api.dos.me/trust/flags` | `POST app.dosafe.io/api/report` |
 
 The DOS.Me Trust API endpoints are deprecated and will be removed on **2026-11-01**.
 
@@ -275,5 +388,5 @@ The DOS.Me Trust API endpoints are deprecated and will be removed on **2026-11-0
 
 Contact the DOSafe team with:
 1. Your product name
-2. Required scopes (`check`, `bulk`, `report`)
+2. Required scopes (`check`, `bulk`, `report`, `detect`, `url-check`, `entity-check`)
 3. Expected daily volume

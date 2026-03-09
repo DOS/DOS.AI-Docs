@@ -1,16 +1,19 @@
 # DOSafe Threat Intelligence System
 
-**Updated:** 2026-03-04
-**Status:** Phase 1 COMPLETE (DB + Sync + Check Flow). Phase 2 (User Reports + Clustering) TODO.
+**Updated:** 2026-03-05
+**Status:** Phase 1 + 1.5 COMPLETE (DB + Sync + Check Flow + Vietnamese Scrapers + Auto-Sync). Phase 2 (User Reports + DOS Chain sync) TODO.
 
 ## Overview
 
 DOSafe aggregates threat data from multiple external sources into a unified Supabase database (`dosafe.threat_intel`), enabling instant DB-first lookups for URL/phone/entity scam checks with runtime fallback and automatic caching.
 
 **Key stats:**
-- **636,000+ entries** from 5 sources (ScamSniffer, MetaMask, ChongLuaDao, URLhaus, OpenPhish)
-- **Entity types:** domains (611k), URLs (22k), wallets (2.5k)
-- **Sync cadence:** Every 6 hours via pg_cron → Edge Function
+- **700,000+ entries** from 10 sources (ScamSniffer, MetaMask, ChongLuaDao, URLhaus, OpenPhish, Tín Nhiệm Mạng, admin.vn, checkscam.vn, scam.vn, runtime cache)
+- **Entity types:** domains (611k+), URLs (22k), wallets (2.5k), phones, bank_accounts, facebook, email
+- **89,000+ threat clusters** linking related scammer entities
+- **63,000+ raw imports** staged from Vietnamese scam databases
+- **Evidence images** stored in Supabase Storage (`evidence` bucket)
+- **Sync cadence:** Every 6 hours (structured feeds) + daily at 02:00 UTC (scraped sources)
 - **Lookup speed:** <10ms (SHA-256 hash index)
 
 ## Architecture
@@ -20,10 +23,12 @@ DOSafe aggregates threat data from multiple external sources into a unified Supa
 │                    DATA INGESTION                            │
 │                                                              │
 │  pg_cron (every 6h) → Edge Function: sync-threats            │
-│                        ├── ScamSniffer scam-db (343k+2.5k)  │
-│                        ├── MetaMask eth-phishing (233k)      │
-│                        ├── URLhaus abuse.ch (22k)            │
 │                        ├── OpenPhish community (300)         │
+│                        ├── URLhaus abuse.ch (22k)            │
+│                        ├── Tín Nhiệm Mạng (60/cycle, 125k+) │
+│                        ├── ScamSniffer wallets (2.5k)        │
+│                        ├── MetaMask eth-phishing (233k)      │
+│                        ├── ScamSniffer domains (343k)        │
 │                        └── [Future: DOS Chain on-chain sync] │
 │                                    │                         │
 │                                    ▼                         │
@@ -138,8 +143,14 @@ Monitoring table for sync health.
 | `dosafe.lookup_threats(p_entity_hash text)` | Query active, non-expired threats by hash | anon + service_role |
 | `dosafe.lookup_cluster_members(p_cluster_id uuid)` | Query active members of a cluster | anon + service_role |
 | `dosafe.bulk_upsert_threats(p_entries jsonb)` | Batch upsert with DB-side SHA-256 hashing (pgcrypto) | service_role only |
+| `dosafe.bulk_upsert_raw_imports(p_entries jsonb)` | Stage raw scraper entries for processing | service_role only |
+| `dosafe.process_pending_imports(p_limit int)` | Extract entities (phone, bank_account, domain, facebook, email) from raw_imports → threat_intel + cluster linking | service_role only |
 
-**Migration file:** `supabase/migrations/20260304000000_threat_intel.sql`
+**Migration files:**
+- `20260304000000_threat_intel.sql` — Core schema
+- `20260305000000_raw_imports.sql` — Scraper staging table
+- `20260305000008_process_imports_add_domain.sql` — Domain + facebook extraction
+- `20260305000009_process_imports_add_email.sql` — Email extraction
 
 ## Data Sources
 
@@ -147,12 +158,33 @@ Monitoring table for sync health.
 
 | Source | Type | Size | Sync | Mapping |
 |--------|------|------|------|---------|
-| ScamSniffer scam-database | GitHub JSON | 343k domains + 2.5k wallets | Full replace / 6h | `domain`/`wallet`, `scam`, risk 85 |
-| MetaMask eth-phishing-detect | GitHub JSON | 233k domains | Full replace / 6h | `domain`, `phishing`, risk 90 |
-| ChongLuaDao blocklist | GitHub JSON | 34k domains (static) | One-time import | `domain`, `phishing`, risk 85 |
+| OpenPhish community | Text feed | 300 URLs | Upsert / 6h | `url`, `phishing`, risk 80 |
 | URLhaus (abuse.ch) | Text feed | 22k URLs | Upsert / 6h | `url`, `malware`, risk 85 |
-| OpenPhish community | Text feed | 300 URLs | Full replace / 6h | `url`, `phishing`, risk 80 |
+| Tín Nhiệm Mạng (tinnhiemmang.vn) | HTML scraping | 125k+ domains (bulk), 60/cycle (incremental) | 6h incremental (3 pages) | `domain`, `scam`, risk 70-85 |
+| ScamSniffer wallets | GitHub JSON | 2.5k wallets | Full replace / 6h | `wallet`, `scam`, risk 85 |
+| MetaMask eth-phishing-detect | GitHub JSON | 233k domains | Full replace / 6h | `domain`, `phishing`, risk 90 |
+| ScamSniffer domains | GitHub JSON | 343k domains | Full replace / 6h (may timeout on Edge) | `domain`, `scam`, risk 85 |
+| ChongLuaDao blocklist | GitHub JSON | 34k domains (static, frozen May 2024) | One-time import | `domain`, `phishing`, risk 85 |
 | Runtime cache | Auto-generated | Growing | On each check | Various, risk varies, 7-day TTL |
+
+**Note:** Sources in `sync-threats` are ordered small-to-large so that small sources complete even if large sources (ScamSniffer domains 343k) timeout on Edge Function. ScamSniffer domains timeout is non-critical — data still refreshes when it does succeed.
+
+### Phase 1.5 (Active — Vietnamese Scrapers)
+
+| Source | Type | Size | Sync | Mapping |
+|--------|------|------|------|---------|
+| admin.vn | HTML scraping | 963 reports (81 pages) | Daily incremental (page 1) | `phone`/`bank_account`/`facebook`, risk 60-80 |
+| checkscam.vn | WP REST API + HTML deep scrape | 62,472 reports | Daily incremental (since last sync) | `phone`/`bank_account`/`facebook`/`domain`/`email`, risk 60-80 |
+| scam.vn | HTML scraping (list pages only) | 12,697 reports (bulk), 3 pages/cycle | Daily incremental | `domain`/`phone`/`name`, risk 60-80 |
+
+**Entity types extracted from Vietnamese scrapers:** phone, bank_account, facebook, domain, email, name
+
+**Scraper Pipeline:**
+- Bulk import: Local Deno scripts (`scripts/scrape-*.ts`) → `raw_imports` staging → `process_pending_imports()` RPC
+- Unified scraper: `scripts/scrape-checkscam-vn.ts` — paginated WP API discovery + HTML deep scrape (hidden `display:none` div extraction for phone/STK/bank/facebook/domain/email, evidence images)
+- Incremental: Edge Function `sync-scraped-sources` via pg_cron (daily at 02:00 UTC)
+- Evidence images: Stored in `evidence` bucket as `checkscam_vn/{source_id}/{index}.jpg`
+- **Note:** scam.vn detail pages (`/canh-bao/*`) are server-side blocked for all users (not just scrapers). Only list pages work.
 
 ### Phase 2 (Planned)
 
@@ -162,7 +194,6 @@ Monitoring table for sync health.
 | User reports | Telegram bot / Web | `/report` command, LLM entity extraction, initial risk 50 |
 | PhishStats | CSV API | ~5k URLs/day, free |
 | kiemtraluadao.vn | Vietnamese scam checker | Investigating API access |
-| checkscam.vn | Vietnamese scam checker | Investigating API access |
 
 ## Sync Infrastructure
 
@@ -172,7 +203,7 @@ Monitoring table for sync health.
 
 Runs on Supabase Edge Runtime (Deno 2). Uses **raw `fetch()`** instead of `supabase-js` client for reliable schema routing (`Content-Profile: dosafe` header).
 
-Key design: Sources are processed **sequentially** (not parallel) to reduce peak memory in Edge Function. Each source's data is passed to `dosafe.bulk_upsert_threats()` SQL function which does **DB-side SHA-256 hashing** via pgcrypto — avoids Edge Function resource limits when processing 233k+ entries.
+Key design: Sources are processed **sequentially** (not parallel) to reduce peak memory in Edge Function, **ordered small-to-large** so small sources complete even if large ones timeout. Each source's data is passed to `dosafe.bulk_upsert_threats()` SQL function which does **DB-side SHA-256 hashing** via pgcrypto — avoids Edge Function resource limits when processing 233k+ entries.
 
 ```
 sync-threats flow:
@@ -184,31 +215,42 @@ sync-threats flow:
   6. Repeat for next source
 ```
 
-### pg_cron Schedule
+### Edge Function: `sync-scraped-sources`
 
-```sql
-SELECT cron.schedule(
-  'sync-threats-6h',
-  '0 */6 * * *',
-  $$SELECT net.http_post(
-    url := '<supabase-url>/functions/v1/sync-threats',
-    headers := '{"Authorization":"Bearer cron-trigger"}'::jsonb
-  )$$
-);
+**Location:** `supabase/functions/sync-scraped-sources/index.ts`
+
+Handles Vietnamese scraper sources (admin.vn, checkscam.vn, scam.vn). Uses `raw_imports` staging table → `process_pending_imports()` for entity extraction + cluster linking.
+
+```
+sync-scraped-sources flow:
+  1. Fetch HTML/API data from each source
+  2. Transform to { source, source_id, raw_data }
+  3. Chunk into 500-entry batches
+  4. Call RPC bulk_upsert_raw_imports(chunk) — staging
+  5. After all sources done: Call process_pending_imports(10000)
+  6. Log results to sync_log
 ```
 
-The Edge Function is deployed with `--no-verify-jwt`, so any Bearer token works for the cron trigger.
+### pg_cron Schedules
+
+| Schedule | Edge Function | Cron Expression |
+|----------|---------------|-----------------|
+| `sync-threats-6h` | `sync-threats` | `0 */6 * * *` |
+| `daily-scraped-sources-sync` | `sync-scraped-sources` | `0 2 * * *` (02:00 UTC) |
+
+Both Edge Functions are deployed with `--no-verify-jwt`. Auth uses Vault-stored `service_role_key`.
 
 ### Performance
 
-| Source | Entries | Sync Time |
-|--------|---------|-----------|
-| OpenPhish | 300 | ~1s |
-| URLhaus | 22k | ~5s |
-| MetaMask | 233k | ~37s |
-| ScamSniffer domains | 343k | ~40s |
-| ScamSniffer wallets | 2.5k | ~1s |
-| **Total** | **~636k** | **~109s** |
+| Source | Entries | Sync Time | Notes |
+|--------|---------|-----------|-------|
+| OpenPhish | 300 | ~1s | |
+| URLhaus | 22k | ~5s | |
+| Tín Nhiệm Mạng | 60 | ~3s | Incremental (3 pages) |
+| ScamSniffer wallets | 2.5k | ~2s | |
+| MetaMask | 233k | ~37s | |
+| ScamSniffer domains | 343k | ~40s | Often times out on Edge, non-critical |
+| **Total (sync-threats)** | **~636k** | **~90s** | Small sources always complete |
 
 ## Check Flow Integration
 
@@ -354,8 +396,9 @@ SUPABASE_SERVICE_ROLE_KEY=...
 ## Phase 2 Roadmap
 
 - [ ] User report command (`/report`) — LLM entity extraction from free text
-- [ ] Entity clustering — auto-link related entities (same scammer group)
+- [x] Entity clustering — auto-link related entities via `process_pending_imports()` (phone/bank_account/domain/email matching)
 - [ ] DOS Chain on-chain sync — incremental attestation ingestion
 - [ ] PhishStats integration (~5k URLs/day)
-- [ ] Vietnamese-specific sources (chongluadao.vn)
+- [x] Vietnamese-specific sources — tinnhiemmang.vn (125k+), scam.vn (12.7k), admin.vn (963), checkscam.vn (62.5k) all active
 - [ ] Sync to DOS.Me Trust API (confirmed flags → `public.safety_flags`)
+- [ ] Chrome extension integration — auto URL-check + entity-check (see Extension Architecture docs)
