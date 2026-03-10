@@ -1,7 +1,7 @@
 # DOSafe — System Architecture
 
-**Updated:** 2026-03-08
-**Status:** AI Detection (Phase 1–5.5) COMPLETE. Threat Intel Pipeline COMPLETE. Audio/Video TODO.
+**Updated:** 2026-03-10
+**Status:** AI Detection COMPLETE. Threat Intel Pipeline COMPLETE (1.52M+ entries, 13 sources). Risk Scoring V2 COMPLETE. Chrome Extension Protection v0.5.4 COMPLETE. Audio/Video TODO.
 
 **Implementation ownership:** Claude is the primary coding agent for architecture changes; this document is the handoff/reference source for Claude-first implementation.
 
@@ -205,7 +205,7 @@ public.subscriptions (
 ## Safety Data Flow
 
 ```
-External threat sources (11 feeds)
+External threat sources (13 feeds)
   │  ScamSniffer, MetaMask, Phishing.Database, URLhaus,
   │  OpenPhish, checkscam.vn, admin.vn, scam.vn, etc.
   │
@@ -214,7 +214,7 @@ dosafe.raw_imports (staging)
   │  pg_cron: sync-threats-6h, sync-phishing-db, daily-scraped
   │
   ▼
-dosafe.threat_intel (1.2M+ entries)
+dosafe.threat_intel (1.52M+ entries)
 dosafe.threat_clusters (89k+ scammer groups)
   │
   ├── DOSafe entity-check / url-check  ← direct query (dosafe.threat_intel)
@@ -294,17 +294,22 @@ DOSafe/
 │   │       │   ├── page.tsx    # Landing page
 │   │       │   └── ...         # Static pages (about, pricing, privacy, terms)
 │   │       └── lib/            # Shared libraries
-│   │           ├── threat-intel.ts    # Threat DB lookup/upsert
-│   │           ├── doschain.ts        # DOS Chain EAS queries (viem)
-│   │           ├── dosafe-quota.ts    # Quota management
-│   │           ├── trusted-domains.ts # Whitelisted domains
-│   │           ├── url-normalize.ts   # URL normalization + hashing
-│   │           └── dosai-session.ts   # Auth session validation
-│   └── extension/              # Chrome extension (Manifest V3)
+│   │           ├── entity-scoring.ts   # V2 risk scoring engine (tiers, freshness, corroboration)
+│   │           ├── entity-web-search.ts # Web search + LLM entity analysis
+│   │           ├── threat-intel.ts     # Threat DB lookup/upsert
+│   │           ├── doschain.ts         # DOS Chain EAS queries (viem)
+│   │           ├── dosme-trust.ts      # DOS.Me Identity API client
+│   │           ├── dosafe-quota.ts     # Quota management
+│   │           ├── trusted-domains.ts  # Whitelisted domains (44 entries)
+│   │           ├── url-normalize.ts    # URL normalization + hashing
+│   │           └── dosai-session.ts    # Auth session validation
+│   └── extension/              # Chrome extension (Manifest V3) — v0.5.4
 │       ├── manifest.json
-│       ├── popup.js/html/css   # Extension popup UI
-│       ├── background.js       # Service worker
-│       └── content-facebook.js # Facebook-specific content script
+│       ├── popup.html/css      # Side panel UI
+│       ├── background.js       # Service worker + icon badge management
+│       ├── protection-content.js  # Real-time URL protection overlay
+│       ├── content-facebook.js    # Facebook-specific content script
+│       └── content-dosafe-auth.js # Extension auth callback
 ├── supabase/
 │   ├── functions/
 │   │   ├── dosafe-telegram/    # Telegram bot (Deno 2 Edge Function)
@@ -382,39 +387,62 @@ Input image (≤10MB, JPEG/PNG/WEBP/GIF)
 
 ### 3. URL/Domain Scam Check (`/api/url-check`)
 
-Hybrid DB-first + runtime fallback check. See [threat-intel.md](threat-intel.md) for full details.
+Hybrid DB-first + runtime check pipeline. Uses V2 scoring engine with source tiers, freshness decay, and corroboration bonus. See [threat-intel.md](threat-intel.md) for DB details.
 
 ```
 Input URL
   │
+  ├── 0. Typosquatting detection (sync, <1ms)
+  │   └── Levenshtein distance + homoglyph normalization vs 44 trusted domains
+  │
   ├── 1. DB lookup (dosafe.threat_intel) — <10ms
   │   ├── Hash URL → lookup_threats()
-  │   └── Hash domain → lookup_threats()
+  │   └── Hash domain → lookup_threats() (skip for trusted domains)
   │
-  ├── 2. Runtime checks (parallel)
-  │   ├── Trusted domain whitelist
-  │   ├── Google Safe Browsing
+  ├── 2. Phase 1: Runtime checks (parallel)
+  │   ├── Trusted domain whitelist (44 major platforms)
+  │   ├── Google Safe Browsing API v4
   │   ├── WHOIS/RDAP domain age
-  │   ├── Web search corroboration (Serper → SerpApi fallback)
+  │   ├── Web search via searchEntityWeb() (Serper → SerpApi, 8 results)
   │   └── DOS Chain on-chain attestations
   │
-  ├── 3. Risk assessment (combines all signals)
-  │   → critical / high / medium / low / safe
+  ├── 3. Phase 2: LLM Analysis (sequential, after Phase 1)
+  │   └── analyzeEntityLLM() — Qwen3.5-35B analyzes web results
+  │       + threat intel summary → structured signals + Vietnamese summary
   │
-  └── 4. Cache runtime result (fire-and-forget, 7-day TTL)
+  ├── 4. V2 Risk Scoring (computeRiskScoreV2)
+  │   ├── Signal weights × source tier multiplier × freshness factor
+  │   ├── Corroboration bonus (2+ independent sources)
+  │   ├── Confidence level (low / medium / high)
+  │   └── → riskScore (0–100) + riskLevel + confidence
+  │
+  └── 5. Cache runtime result (fire-and-forget, 7-day TTL)
+
+  Extension fast path (X-Client-Type: extension):
+    Skips: WHOIS, web search, LLM, on-chain, session check, quota
+    Only: DB lookup + Safe Browsing + trusted domain + typosquatting
 ```
+
+**Response:** `riskScore`, `riskLevel`, `confidence`, `riskSignals[]`, `webAnalysis`, `llmSummary`, `typosquatting`, `threatIntel`, `onChain`
 
 ### 4. Entity Risk Check (`/api/entity-check`)
 
-Check risk for phone numbers, wallets, emails, bank accounts, etc.
+Check risk for phone numbers, wallets, emails, bank accounts, etc. Uses same V2 scoring engine.
 
 ```
 Input: { entityType, entityId }
   │
-  ├── dosafe.threat_intel DB lookup    — primary source (1.2M+ entries)
-  ├── DOS Chain EAS query              — on-chain attestations (15s timeout)
-  └── (Planned) DOS-Me Trust API      — community flags from other products
-      → Combined risk assessment + riskSignals + cluster linking
+  ├── Phase 1 (parallel)
+  │   ├── dosafe.threat_intel DB lookup    — 1.52M+ entries
+  │   ├── DOS Chain EAS query              — on-chain attestations (15s timeout)
+  │   ├── DOS.Me Identity API              — member trust score, flags, DOS ID
+  │   └── Web search (Serper → SerpApi)    — 8 results (skip for bulk)
+  │
+  ├── Phase 2 (sequential)
+  │   └── LLM Analysis (analyzeEntityLLM)  — structured signals + Vietnamese summary
+  │
+  └── V2 Scoring (computeRiskScoreV2)
+      → riskScore + riskLevel + confidence + riskSignals + llmSummary
 ```
 
 **Supported types:** phone, email, wallet, url, domain, bank_account, national_id, telegram, facebook, organization
@@ -427,12 +455,15 @@ Bilingual: Vietnamese + English (auto-detected)
 Quota: 20 checks/day per chat
 Calls: `dosafe.io/api/*` internally (via `DOSAFE_API_URL` secret)
 
-### 6. Chrome Extension (`apps/extension`)
+### 6. Chrome Extension (`apps/extension`) — v0.5.4
 
+- **Real-time URL protection**: Auto-checks current tab URL via `/api/url-check` with `X-Client-Type: extension` fast path
+- **Icon badge**: Green ✓ (safe/low), Yellow ! (medium), Red ✗ (high/critical) on extension icon
+- **Warning overlay**: Full-page overlay for high/critical risk — localized (vi/en), human-readable signal names, real DB sources
 - AI text detection on selected text or full page
-- URL scam check on current page
 - Facebook profile analysis (content script)
 - Side panel results display
+- Auth via `dosafe.io/auth/extension-callback`
 
 ### 7. Mobile App (Flutter — `DOSafe-Mobile`)
 
@@ -446,7 +477,7 @@ Calls: `dosafe.io/api/*` internally (via `DOSAFE_API_URL` secret)
 Detailed in [threat-intel.md](threat-intel.md).
 
 **Summary:**
-- **1.2M+ entries** from 11 sources: Phishing.Database (~711k), ScamSniffer (346k), MetaMask (234k), Tín Nhiệm Mạng (97k), ChongLuaDao (34k), URLhaus (23k), checkscam.vn (13k), scam.vn (10k), admin.vn (963), OpenPhish, ScamVN
+- **1.52M+ entries** from 13 sources: Phishing.Database (~450k), ScamSniffer (346k), nTrust/NCA (252k), MetaMask (234k), Tín Nhiệm Mạng (97k), TrueCaller (40k), ChongLuaDao (34k), checkscam.vn (27k), URLhaus (26k), scam.vn (10k), admin.vn (963), OpenPhish
 - **Schema:** `dosafe.threat_intel` + `dosafe.threat_clusters` (89k+ cluster links)
 - **Entity types:** domain, url, wallet, phone, bank_account, facebook, email, name
 - **Sync schedules (pg_cron):**
@@ -466,6 +497,189 @@ dosafe.threat_intel
 
 ---
 
+## Risk Scoring Engine V2
+
+**Implementation:** `src/lib/entity-scoring.ts` — shared engine used by both `/api/url-check` and `/api/entity-check`.
+
+### Concept
+
+The V1 scoring system used flat signal weights — every source contributing the same amount regardless of quality, freshness, or corroboration. This led to:
+
+- **False positives**: Crowdsourced Vietnamese sources (scam.vn, checkscam.vn) flagging major platforms like google.com
+- **Stale data inflation**: Year-old reports from a single unverified source scoring as high-risk
+- **No confidence signal**: Users couldn't tell if a "medium risk" was backed by 5 authoritative sources or 1 crowdsourced report
+
+V2 solves these with 5 mechanisms: **source tiers**, **freshness decay**, **corroboration bonus**, **confidence levels**, and **typosquatting detection**.
+
+### Design Principles
+
+1. **No single source determines verdict alone** — base score is 15 (low), signals add/subtract
+2. **Higher-quality sources have more influence** — Google Safe Browsing (tier 1) carries more weight than runtime_cache (tier 4)
+3. **Recent reports weigh more** — a phishing report from yesterday is more relevant than one from 2 years ago
+4. **Multiple independent sources increase confidence** — 3 sources saying "scam" is more trustworthy than 1
+5. **Trusted domains bypass domain-level DB lookup** — prevents false positives from crowdsourced reports on major platforms
+
+### Source Tiers
+
+Each threat intel source is classified into a quality tier. The tier multiplier scales the signal's base weight.
+
+| Tier | Multiplier | Sources | Rationale |
+|------|-----------|---------|-----------|
+| **1 — Authoritative** | 1.0 | Google Safe Browsing, Tín Nhiệm Mạng (NCSC VN), tinnhiemmang_trusted_webs/orgs | Government/industry authority, low false positive rate |
+| **2 — Curated Security** | 0.85 | MetaMask, Phishing.Database, ScamSniffer, URLhaus, OpenPhish | Security teams with review processes |
+| **3 — Crowdsourced VN** | 0.70 | checkscam.vn, scam.vn, admin.vn, nTrust/NCA, TrueCaller, ChongLuaDao | Community-driven, higher noise, valuable for VN-specific threats |
+| **4 — Heuristic** | 0.50 | runtime_cache | Our own cached results, may be stale or from incomplete checks |
+
+**Scoring formula for DB signals:**
+```
+effective_weight = base_weight × tier_multiplier × freshness_factor
+```
+
+For non-DB signals (on-chain, DOS.Me, web search, URL-specific), base weight is used directly.
+
+### Freshness Decay
+
+Reports decay in influence as they age, measured by `last_seen_at`:
+
+| Age | Factor | Rationale |
+|-----|--------|-----------|
+| ≤ 30 days | 1.0 | Fresh, highly relevant |
+| ≤ 90 days | 0.85 | Recent, still relevant |
+| ≤ 365 days | 0.70 | Aging, may no longer be active |
+| ≤ 2 years | 0.50 | Old, likely inactive but retain historical context |
+| > 2 years | 0.30 | Very old, minimal influence — scam sites almost certainly dead |
+
+If `last_seen_at` is null: factor = 0.70 (treat as aging).
+
+### Corroboration Bonus
+
+Multiple independent risk sources increase the score and confidence:
+
+| Unique risk sources | Bonus |
+|---------------------|-------|
+| 4+ | +20 |
+| 3 | +15 |
+| 2 | +10 |
+| 1 | 0 |
+
+Sources counted: all DB sources (excluding `google_safe_browsing` for "clean" results and `runtime_cache`), plus `onchain` and `google_safe_browsing` when they report actual threats.
+
+### Confidence Levels
+
+Returned alongside riskScore to help UIs and downstream consumers calibrate trust:
+
+| Level | Criteria |
+|-------|----------|
+| **high** | 3+ unique risk sources, OR tier 1 source + 2+ total sources |
+| **medium** | 2+ unique risk sources, OR 1 tier 1 source |
+| **low** | 0–1 risk sources, no tier 1 |
+
+### Typosquatting Detection
+
+Detects domains that visually resemble trusted brands:
+
+1. **Levenshtein distance**: Compares domain base name against 44 trusted domains. Distance 1–2 for domains ≥ 5 chars, distance 1 for shorter.
+2. **Homoglyph normalization**: Cyrillic `а` → `a`, `е` → `e`, `0` → `o`, `1` → `l`, etc. — catches `gооgle.com` (Cyrillic o's).
+3. **Signal**: `typosquatting_suspected` (+25 weight) with `similarTo` field identifying the targeted brand.
+
+### Signal Weights Reference (V2)
+
+#### Threat DB Signals (× tier × freshness)
+
+| Signal | Base Weight |
+|--------|------------|
+| `db_flagged_phishing` | +85 |
+| `db_flagged_malware` | +80 |
+| `db_flagged_fraud` | +75 |
+| `db_flagged_scam` | +70 |
+| `db_flagged_spam` | +50 |
+| `db_flagged_robocall` | +45 |
+| `db_flagged_unwanted` / `db_flagged_political` | +40 |
+| `db_verified_legitimate` | −40 |
+| `db_verified_clean` | −25 |
+| `db_very_high_report_count` (≥1000 reports) | +35 |
+| `db_high_report_count` (≥100 reports) | +20 |
+| `cluster_linked` | +12 |
+
+#### On-Chain Signals (no tier reduction)
+
+| Signal | Weight |
+|--------|--------|
+| `onchain_flagged_phishing` | +85 |
+| `onchain_flagged_scam` | +70 |
+| `onchain_high_risk` (≥80) | +60 |
+| `onchain_medium_risk` (50–79) | +30 |
+| `onchain_verified_legitimate` | −40 |
+| `onchain_trusted` (<20) | −25 |
+
+#### DOS.Me Identity Signals
+
+| Signal | Weight |
+|--------|--------|
+| `dosme_member_flagged` | +40 |
+| `dosme_trust_passing` | −20 |
+| `dosme_high_trust` | −15 |
+| `dosme_multi_verified` | −10 |
+| `dosme_medium_trust` / `dosme_has_dosid` | −5 |
+
+#### Web Search + LLM Signals
+
+| Signal | Weight |
+|--------|--------|
+| `web_identified_scam` | +55 |
+| `web_scam_reports` | +35 |
+| `web_spam_reports` | +25 |
+| `web_identified_brand` | −15 |
+| `web_identified_government` | −25 |
+| `web_mixed_signals` | +8 |
+
+#### URL-Specific Signals (extra weights in url-check only)
+
+| Signal | Weight |
+|--------|--------|
+| `safe_browsing_malware` / `safe_browsing_social_engineering` | +90 |
+| `safe_browsing_unwanted_software` | +70 |
+| `safe_browsing_potentially_harmful_application` | +60 |
+| `new_domain` (<30 days) | +25 |
+| `young_domain` (<90 days) | +10 |
+| `trusted_domain` | −40 |
+| `typosquatting_suspected` | +25 |
+
+### Score → Risk Level
+
+| Score | Level |
+|-------|-------|
+| 0–19 | `safe` |
+| 20–49 | `low` |
+| 50–74 | `medium` |
+| 75–89 | `high` |
+| 90–100 | `critical` |
+
+### Web Search + LLM Pipeline
+
+**Implementation:** `src/lib/entity-web-search.ts`
+
+The V1 URL pipeline used simple keyword matching (`hasScamTerms()`) on web search results. V2 replaces this with a full LLM analysis pipeline:
+
+```
+1. searchEntityWeb(entityType, entityId)
+   └── Builds entity-type-aware query (phone: local+intl format, domain: +scam/review terms)
+   └── Serper → SerpApi fallback, 8 results
+
+2. analyzeEntityLLM(entityType, entityId, webResults, threatIntelSummary)
+   └── Qwen3.5-35B-A3B-GPTQ-Int4 (api.dos.ai)
+   └── Compact prompt: entity + top 5 results (120-char snippets) + threat intel summary
+   └── Returns: entity_identity, risk_level, risk_score, signals[], summary (Vietnamese)
+   └── max_tokens=250, temperature=0.1
+
+3. getWebSignals(webAnalysis)
+   └── Filters LLM signals to valid set: web_identified_scam, web_scam_reports, etc.
+```
+
+**Performance:** Web search runs parallel with Phase 1 (DB/on-chain/DOS.Me). Only LLM analysis waits for Phase 1 results. Total added latency: ~3–5s for full path (skipped on extension fast path).
+
+---
+
 ## Database Layout
 
 ### Supabase Schemas
@@ -480,7 +694,7 @@ dosafe.threat_intel
 
 | Table | Schema | Purpose |
 |-------|--------|---------|
-| `threat_intel` | dosafe | Unified threat data (1.2M+ entries, all sources) |
+| `threat_intel` | dosafe | Unified threat data (1.52M+ entries, all sources) |
 | `threat_clusters` | dosafe | Scammer group linking (89k+ clusters) |
 | `raw_imports` | dosafe | Staging for scraped reports |
 | `sync_log` | dosafe | Sync health monitoring |
@@ -589,16 +803,22 @@ DOS_ME_TRUST_API_KEY=...
 - [x] Image detection (C2PA + EXIF/DCT + reverse search + LLM)
 - [x] Paraphrase shield + ESL de-biasing
 - [x] URL/domain scam check with on-chain integration
-- [x] URL/domain web-search corroboration layer (Serper → SerpApi fallback)
 - [x] Telegram bot with bilingual support
-- [x] Chrome extension
+- [x] Chrome extension with real-time URL protection (v0.5.4)
 - [x] Mobile app (Flutter, calls dosafe.io/api/*)
-- [x] Threat intelligence pipeline (1.2M+ entries, 11 sources)
+- [x] Threat intelligence pipeline (1.52M+ entries, 13 sources)
 - [x] Quota system (anonymous + authenticated)
 - [x] Vietnamese scraper pipeline (admin.vn + checkscam.vn + scam.vn → raw_imports → threat_intel)
+- [x] nTrust (NCA) + TrueCaller phone DB extraction (292k entries)
 - [x] Deep scraping with evidence image extraction + Supabase Storage upload
 - [x] Entity clustering (89k+ clusters)
 - [x] RAID benchmark submission (672k texts, AUROC 0.852)
+- [x] **Risk Scoring V2**: source tiers, freshness decay, corroboration bonus, confidence levels
+- [x] **Typosquatting detection**: Levenshtein + homoglyph normalization
+- [x] **LLM web search pipeline**: replaced keyword matching with Qwen3.5-35B analysis
+- [x] **Extension protection overlay**: localized (vi/en), human-readable signals, real DB sources
+- [x] **Partner API / DOS Shield Gateway**: `/api/v1/check`, `/check/bulk`, `/report`
+- [x] **DOS.Me Identity integration**: member trust score, flags, verified providers
 
 ### Planned
 - [ ] Sync confirmed flags to DOS-Me Trust API (`POST /trust/flags`)
