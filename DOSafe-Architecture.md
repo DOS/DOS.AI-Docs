@@ -105,6 +105,8 @@ Written to by: DOS-Me Trust API (`/trust/flags/:id/attest`). Read by: DOSafe (`d
 
 Both models are natively multimodal (text + image). Auth: `INTERNAL_API_KEY` via `api.dos.ai` gateway (bypasses billing). Fallback: Alibaba Cloud `qwen3.5-flash` when vLLM is unavailable.
 
+**Model alias mapping:** The `api.dos.ai` Worker maps common model aliases to the served model name. `Qwen/Qwen3.5-35B-A3B-FP8`, `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4`, and `qwen3.5-35b` all resolve to `dos-ai` (the vLLM `--served-model-name`). Clients don't need to know the exact deployed model variant.
+
 ---
 
 ## Cross-Product API Patterns
@@ -482,10 +484,13 @@ Input: { entityType, entityId }
 ### 5. Telegram Bot (`supabase/functions/dosafe-telegram`)
 
 Commands: `/detect`, `/scam`, `/phone`, `/quota`, `/help`, `/start`
-Auto-detection: URLs, phone numbers, plain text, photos
+Auto-detection: URLs, phone numbers, plain text, photos + document images
 Bilingual: Vietnamese + English (auto-detected)
 Quota: 20 checks/day per chat
 Calls: `dosafe.io/api/*` internally (via `DOSAFE_API_URL` secret)
+Welcome: "DOSafe — Vệ Sĩ AI Của Bạn" / "Your AI Bodyguard"
+
+**Document image handling:** The bot accepts images sent as documents (original quality files), not just compressed photos. This preserves EXIF and C2PA metadata which Telegram's photo compression strips, enabling accurate image provenance detection.
 
 ### 6. Chrome Extension (`apps/extension`) — v0.5.4
 
@@ -710,6 +715,8 @@ The V1 URL pipeline used simple keyword matching (`hasScamTerms()`) on web searc
 
 **Performance:** Web search runs parallel with Phase 1 (DB/on-chain/DOS.Me). Only LLM analysis waits for Phase 1 results. Total added latency: ~3–5s for full path (skipped on extension fast path).
 
+**LLM Fallback:** When self-hosted vLLM is unavailable, falls back to Alibaba Cloud `qwen3.5-flash` (or other providers). Multi-provider fallback chain configured via `LLM_FALLBACK_PROVIDERS` env var (JSON array of `{name, baseUrl, apiKey, model}` entries). Fallback usage is logged as structured JSON (`event: llm_fallback_used`) with token count and cost estimate for internal cost monitoring.
+
 ---
 
 ## Database Layout
@@ -823,7 +830,7 @@ DOS_ME_TRUST_API_KEY=...
 - **C2PA:** Cryptographic content credentials (~40% of AI images have C2PA in 2026)
 - **EXIF:** Camera metadata + AI tool detection in Software field
 - **DCT:** JPEG quantization table analysis (camera-specific vs AI generic)
-- **Reverse search:** Google Cloud Vision WEB_DETECTION → Serper Lens fallback
+- **Reverse search:** Google Cloud Vision WEB_DETECTION → Serper Lens fallback. Vision returns 3 tiers: `fullMatchingImages` (exact), `partialMatchingImages` (cropped/resized), `pagesWithMatchingImages` (visually similar). Prioritizes exact/partial matches; only falls back to visually similar if none found. Bot only displays exact/partial matches as "sources found" to avoid misleading citations.
 - **LLM visual:** Multimodal rubric analysis — Qwen3.5-35B (natively multimodal, no separate VL model needed)
 
 ---
