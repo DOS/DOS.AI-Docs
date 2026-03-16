@@ -263,13 +263,99 @@ Requires user to set DOSafe as default phone app screening provider (RoleManager
 
 CallDirectory Extension syncs DOSafe block list to iOS system. Updates via background fetch (max 24h). iOS does NOT support dynamic per-call screening — only static block list + caller ID label.
 
+---
+
+## Caller ID App DB Extraction Results
+
+**Method:** Android emulator (Google APIs, root via `adb root`) + `-writable-system` flag.
+Extract offline spam databases from popular caller ID apps to seed DOSafe threat_intel.
+
+| App | Package | Result | Records |
+|-----|---------|--------|---------|
+| **TrueCaller** | `com.truecaller` | **Offline DB readable** ✅ | **40k** top spammers VN (alias + report_count + categories) |
+| **nTrust** (NCA) | `com.nca.vn.ntrust` | **Offline DB readable** ✅ | **180k–252k** phone numbers (hotList: spam/fraud/whitelist) |
+| GetContact | `app.source.getcontact` | API-only, no offline spam DB | 0 |
+| Whoscall | `gogolook.callgogolook2` | Encrypted DB (SQLCipher) + requires Play Store | 0 |
+| Hiya | — | Requires Google Play Store | N/A |
+| TrustCall VN | `com.vn.trustcall` | Requires Google Play Store | N/A |
+| iCallMe | — | 26 demo records only | 26 |
+| CallApp | — | No offline spam DB | 0 |
+| Mr. Number | — | Paid subscription required | N/A |
+| Caller ID & Block | — | Crash on emulator | N/A |
+
+### TrueCaller extraction
+- DB path: `/data/data/com.truecaller/databases/tc.db` → `topspammers` table
+- Fields: `value` (phone), `label` (display name), `count` (report count), `spam_categories`
+- Extracted via Google APIs emulator (adb root) with original unpatched APK
+- Patched APK FAILED: TrueCaller has server-side integrity check (signature verification)
+
+### nTrust extraction
+- DB path: `/data/data/com.nca.vn.ntrust/databases/database.db` → `phone_number` table
+- Fields: `id`, `dial_id`, `name`, `contact_type` (hotList), `type_tag` (spam/fraud), `dial_code`, `part_id`
+- App is Flutter-based (NCA Vietnam), no Play Store requirement
+- Data refreshes on app launch — re-extract periodically for new numbers
+
+### Key learnings
+- Google APIs image (root) + `-writable-system` required for DB extraction
+- API 34 recommended (API 36 dm-verity too strict)
+- Most modern caller ID apps either encrypt DB or require Play Store
+- `adb backup` returns empty (47 bytes) for apps with `allowBackup=false`
+- ARM translation works on API 34 x86_64 emulator — can install arm64 split APKs
+
+---
+
 ### Flutter platform channel
 
 ```dart
-// lib/services/call_screening_channel.dart
-const _channel = MethodChannel('dosafe/call_screening');
+// lib/features/call_screening/data/call_screening_channel.dart
+const _channel = MethodChannel('io.dosafe/call_screening');
 
-Future<void> setBlockList(List<String> numbers) async {
-  await _channel.invokeMethod('setBlockList', {'numbers': numbers});
-}
+// Methods: hasRole, requestRole, openSettings, hasOverlayPermission,
+//          requestOverlayPermission, writeIosIdentities
 ```
+
+---
+
+## Implementation Status (2026-03-16)
+
+### Completed
+- **Android CallScreeningService** — `DosafeCallScreeningService.kt`, registered in manifest
+- **ROLE_CALL_SCREENING request** — system popup shows, user can select DOSafe
+- **Phone lookup** — calls DOSafe `/api/entity-check` for incoming numbers
+- **Blocklist sync** — `/api/phone-blacklist` bulk endpoint, local SQLite cache
+- **Call screening UI** — enable/disable toggle, blocklist stats, sync button
+- **GitHub Actions CI/CD** — analyze + Android APK build (iOS pending signing)
+- **Repo**: `github.com/DOS/DOSafe-Mobile` (private)
+
+### iOS Setup (pending Mac)
+- **CallerID** extension target created (Bundle ID: `me.dos.dosafe.callerid`)
+- **LiveCallerID** extension target created (Live Caller ID Lookup, iOS 18+)
+- Both use App Group `group.DOS.ID`
+- `CallDirectoryHandler.swift` code ready
+- Needs: `flutter pub get` on Mac → Cmd+B → commit `project.pbxproj`
+
+### Critical Notes
+
+**BIND_SCREENING_SERVICE permission:**
+```xml
+<!-- CORRECT — matches Truecaller -->
+android:permission="android.permission.BIND_SCREENING_SERVICE"
+
+<!-- WRONG — will compile but role request auto-dismisses -->
+android:permission="android.permission.BIND_CALL_SCREENING_SERVICE"
+```
+Verified by dumping Truecaller manifest (`aapt2 dump xmltree`). The wrong permission name causes `RoleManager.createRequestRoleIntent()` to launch but immediately return `RESULT_CANCELED` (code=0) without showing the system picker dialog.
+
+**FlutterFragmentActivity required:**
+Use `FlutterFragmentActivity` (not `FlutterActivity`) in `MainActivity.kt` to support `ActivityResultLauncher` for role requests on Android 12+.
+
+**Bundle IDs:**
+- Android: `me.dos.dosafe` (namespace in build.gradle.kts)
+- iOS main: `me.dos.dosafe`
+- iOS CallerID: `me.dos.dosafe.callerid`
+- iOS LiveCallerID: `me.dos.dosafe.livecallerid`
+- Kotlin package: `io.dosafe.dosafe_mobile` (legacy, does not affect functionality)
+
+**Signing:**
+- Android keystore: `android/app/dosafe-release.jks` (gitignored, base64 in GitHub Secrets)
+- iOS: pending provisioning profiles + certificates
