@@ -1,6 +1,7 @@
 # Table of contents
 
 * [DOS.AI](README.md)
+* [Changelog](changelog.md)
 
 ## Getting Started
 
@@ -34,7 +35,3 @@
 
 * [Error Codes](support/error-codes.md)
 * [Rate Limits](support/rate-limits.md)
-
-## Changelog
-
-* [Changelog](changelog.md)
