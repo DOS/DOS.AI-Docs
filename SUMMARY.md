@@ -34,3 +34,7 @@
 
 * [Error Codes](support/error-codes.md)
 * [Rate Limits](support/rate-limits.md)
+
+## Changelog
+
+* [Changelog](changelog.md)
