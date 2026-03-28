@@ -2,6 +2,16 @@
 
 New updates and improvements to DOS AI.
 
+
+## March 28, 2026
+
+### Fixed
+
+- `Dashboard` **Removed duplicate Appearance settings** — The Appearance section has been removed from the settings page as it is now accessible via the user menu.
+- `Dashboard` **Fixed avatar initials visibility** — Initials are now hidden when an avatar image is present to prevent visual overlap.
+- `Dashboard` **Updated changelog documentation link** — The changelog sidebar link now correctly redirects to the official documentation site.
+
+
 ## March 27, 2026
 
 ### New
