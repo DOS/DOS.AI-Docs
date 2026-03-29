@@ -3,6 +3,14 @@
 New updates and improvements to DOS AI.
 
 
+
+## March 29, 2026
+
+### New
+
+- `Integrations` **WhatsApp dual-mode and Discord connect** — Added support for WhatsApp dual-mode (shared bot and native QR) and a new Discord connection UI.
+
+
 ## March 28, 2026
 
 ### Fixed
