@@ -10,14 +10,16 @@
  *   deno run --allow-net --allow-read --allow-env scripts/sync-changelog.ts
  *
  * Env:
- *   SUPABASE_URL          — Supabase project URL
- *   SUPABASE_SERVICE_KEY  — Service role key (for write access)
- *   GITHUB_TOKEN          — (optional) GitHub PAT for higher rate limits
- *   VLLM_URL              — vLLM endpoint for LLM rewrite (optional)
- *   VLLM_API_KEY          — API key for vLLM
+ *   SUPABASE_URL              — Supabase project URL
+ *   CHANGELOG_WRITE_KEY       — Write key for sync-changelog Edge Function
+ *   SUPABASE_SERVICE_KEY      — (fallback) Service role key for direct PostgREST
+ *   GITHUB_TOKEN              — (optional) GitHub PAT for higher rate limits
+ *   VLLM_URL                  — vLLM endpoint for LLM rewrite (optional)
+ *   VLLM_API_KEY              — API key for vLLM
  */
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://gulptwduchsjcsbndmua.supabase.co";
+const CHANGELOG_WRITE_KEY = Deno.env.get("CHANGELOG_WRITE_KEY") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN") || "";
 const VLLM_URL = Deno.env.get("VLLM_URL") || "https://inference.dos.ai";
@@ -228,11 +230,45 @@ async function rewriteEntries(entries: ChangelogEntry[]): Promise<ChangelogEntry
 // --- 4. Upsert to Supabase ---
 
 async function upsertEntries(entries: ChangelogEntry[]): Promise<number> {
-  if (!SUPABASE_KEY) {
-    console.error("SUPABASE_SERVICE_KEY not set, skipping DB sync");
+  // Prefer Edge Function (only needs write key, no service role exposure)
+  if (CHANGELOG_WRITE_KEY) {
+    return upsertViaEdgeFunction(entries);
+  }
+  // Fallback: direct PostgREST (local dev with service key)
+  if (SUPABASE_KEY) {
+    return upsertViaPostgREST(entries);
+  }
+  console.error("Neither CHANGELOG_WRITE_KEY nor SUPABASE_SERVICE_KEY set, skipping DB sync");
+  return 0;
+}
+
+async function upsertViaEdgeFunction(entries: ChangelogEntry[]): Promise<number> {
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/sync-changelog`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-write-key": CHANGELOG_WRITE_KEY,
+      },
+      body: JSON.stringify({ entries }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`Edge Function error: ${res.status} ${err}`);
     return 0;
   }
 
+  const result = await res.json();
+  if (result.errors?.length) {
+    console.warn(`  Edge Function partial errors:`, result.errors);
+  }
+  return result.upserted || 0;
+}
+
+async function upsertViaPostgREST(entries: ChangelogEntry[]): Promise<number> {
   let total = 0;
   for (let i = 0; i < entries.length; i += 50) {
     const batch = entries.slice(i, i + 50);

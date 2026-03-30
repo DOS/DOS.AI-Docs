@@ -19,7 +19,7 @@ jobs:
 
       - name: Sync changelog
         env:
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CHANGELOG_WRITE_KEY: ${{ secrets.CHANGELOG_WRITE_KEY }}
           VLLM_API_KEY: ${{ secrets.DOS_API_KEY }}
           VLLM_URL: https://inference.dos.ai
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
