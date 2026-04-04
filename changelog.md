@@ -9,6 +9,59 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-04-04
+
+- **feature** [dosclaw] Shared Bot Multi-Agent Routing — Messages from shared Telegram/Discord bots now route through the correct agent's OpenClaw container based on chat ID; agent name/ID injected for personality routing
+- **improvement** [gateway] Alert Backend Labels — All container and Status API alerts now include source (LOCAL/AZURE); vLLM health monitoring every 3 minutes via Cloudflare tunnel URLs; recovery alerts bypass dedup cooldown
+- **fix** [dosclaw] Agent Version Display — Agent settings now always show current running version with fallback to "latest" instead of blank
+
+## 2026-04-03
+
+- **feature** [dosclaw] OpenClaw v2026.4.2 — Agents pinned to v2026.4.2 with SearXNG web search plugin enabled; version selector filters to multi-arch tags only
+- **feature** [dosclaw] Agent Usage Billing — Per-agent usage billing endpoints; agents now track and report token consumption
+- **feature** [dashboard] Crypto Payment — Stripe crypto checkout alongside cards; Google Pay, Apple Pay, and Link payment methods supported
+- **fix** [gateway] Billing & Provider Routing — Retail pricing uses customer-requested model identity; cloud-only models fail honestly instead of falling back to vLLM; promo pricing cost floor during upstream billing
+- **fix** [dashboard] Billing Page — SVG brand icons for payment methods, Link display fix, success toast; fixed fetchBillingData crash from missing brand/last4 fields
+- **fix** [gateway] vLLM Health Check URLs — Cloud Run health checks use configured Cloudflare tunnel URLs instead of localhost (unreachable from Cloud Run)
+
+## 2026-04-02
+
+- **feature** [dosclaw] Agent Memory Search — Shared Qwen3-Embedding-4B AWQ embedding service; agents now perform semantic memory search via local vLLM instead of keyword-only recall
+- **feature** [dosclaw] SearXNG Web Search — Self-hosted SearXNG enabled for `web_search` tool in agent containers; no external API key required
+- **fix** [dosafe] Audio Speech Detection — Replaced spectral band analysis (too many false positives on music) with energy CoV + pause ratio; music-only clips now excluded from AI probability blend
+- **fix** [dosafe] Video Frame Extraction — LLM visual analysis now sends extracted frames as base64 images instead of raw video URL; text-only fallback on HTTP 500
+
+## 2026-04-01
+
+- **feature** [gateway] LLM API Marketplace — `GET /v1/catalog` retail endpoint with DB-driven pricing; DeepSeek V3 + Qwen 397B / 122B / 27B now live via DashScope / Alibaba Cloud
+- **fix** [gateway] Billing Race Condition — Replaced race-prone async deduction with atomic `deduct_usage()` PostgreSQL RPC; pre-flight balance gate blocks requests before proxying; streaming billing fixed (was charging 0 tokens on SSE responses)
+- **feature** [gateway] Multi-Backend Agent Routing — `BackendRouter` dispatches agent ops to local or Azure backend per agent; Azure VM CPU/memory/disk monitored via `/metrics`, alerts on 3 consecutive threshold breaches
+- **feature** [gateway] Embeddings Endpoint — `/v1/embeddings` routes to dedicated pooling backend, falls back to DashScope `text-embedding-v4` when local vLLM unavailable
+- **feature** [dashboard] dos-ai Launch Promo — $0.01 / 1M tokens (down from $0.10); promo badge with strikethrough original price on models page and model detail
+- **feature** [dashboard] SEO — JSON-LD structured data, Open Graph, robots.txt, sitemap.xml, `llms.txt`, `ai.txt` for AI crawlers
+- **feature** [dosclaw] Lite Agent Tier — New 2 GB / 0.5 vCPU instance size for free tier users
+- **feature** [dosafe] RDAP + URL Path Detection — RDAP domain registration data and URL path heuristics added to entity risk assessment
+- **fix** [dosclaw] Pairing & Channels — Shared bot auto-approves pairing; Discord Gateway WebSocket reconnect fixed; slug→UUID deep link resolution fixed
+- **fix** [dashboard] Signup Bonus — Fixed $5 credit not granted on Google OAuth login
+
+## 2026-03-31
+
+- **feature** [gateway] Enriched Entity Check — `firstSeenAt`, `reportCount`, `relatedEntities` added to `/v1/dosafe/check` response
+- **feature** [dosclaw] Custom Bot Token Validation — Token validated against Telegram API before saving; Disconnect button for shared/custom bot links; clear existing webhook on new custom token connect
+- **feature** [dosclaw] Channel Linked State UI — Discord/Telegram channel cards show live connection state (shared bot vs custom token)
+- **feature** [dashboard] i18n Agent Detail — 200+ hardcoded strings translated; agent detail page fully internationalized across all 7 supported languages
+- **improvement** [dashboard] Language Switcher Redesign — Globe icon + locale code dropdown with checkmark, matching DOSafe design
+- **fix** [dosclaw] Agent Stability — Fixed OOM crash loops, memory persistence on restart, deep link slug→UUID resolution
+
+## 2026-03-30
+
+- **feature** [dashboard] Comprehensive i18n — All dashboard pages internationalized (agents list, agent detail, plans, billing, settings)
+- **feature** [dashboard] Support Banner — Announcement banner in topbar with Telegram and Discord community links
+- **feature** [dashboard] AI Detector Redirect — AI Detector page redirects to dosafe.io (DOSafe owns detection features)
+- **fix** [dosclaw] Agent Deep Links — Slug→UUID resolution fixed in DeepLink handler; pairing code shown explicitly in Telegram connect UI
+- **fix** [gateway] Image Upload Size — nginx `client_max_body_size` increased to 50 MB for image detection uploads
+- **perf** [dashboard] Agent Detail Load — Parallel data fetching reduces agent detail page load time
+
 ## 2026-03-29
 
 - **feature** [dosclaw] Instance ID Badge — Each agent now shows a short instance ID (e.g. #568bc2) in the header for quick identification when reporting issues
