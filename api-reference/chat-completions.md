@@ -206,3 +206,116 @@ curl https://api.dos.ai/v1/chat/completions \
     "max_tokens": 256
   }'
 ```
+
+### Streaming (cURL)
+
+```bash
+curl https://api.dos.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dos_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  -N \
+  -d '{
+    "model": "dos-ai",
+    "messages": [
+      {"role": "user", "content": "Write a haiku about programming."}
+    ],
+    "stream": true
+  }'
+```
+
+### Using the OpenAI Python SDK
+
+Since DOS AI is OpenAI-compatible, you can use the official OpenAI SDK by changing the base URL:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="dos_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    base_url="https://api.dos.ai/v1"
+)
+
+response = client.chat.completions.create(
+    model="dos-ai",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain quantum computing in simple terms."}
+    ],
+    temperature=0.7,
+    max_tokens=512
+)
+
+print(response.choices[0].message.content)
+```
+
+### Using the OpenAI Node.js SDK
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "dos_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  baseURL: "https://api.dos.ai/v1",
+});
+
+const response = await client.chat.completions.create({
+  model: "dos-ai",
+  messages: [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "Explain quantum computing in simple terms." },
+  ],
+  temperature: 0.7,
+  max_tokens: 512,
+});
+
+console.log(response.choices[0].message.content);
+```
+
+### JSON Mode
+
+```bash
+curl https://api.dos.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dos_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  -d '{
+    "model": "dos-ai",
+    "messages": [
+      {"role": "system", "content": "Respond in JSON format."},
+      {"role": "user", "content": "List 3 programming languages with their year of creation."}
+    ],
+    "response_format": {"type": "json_object"}
+  }'
+```
+
+### Tool Calling Example
+
+```bash
+curl https://api.dos.ai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dos_sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  -d '{
+    "model": "dos-ai",
+    "messages": [
+      {"role": "user", "content": "What is the weather in Tokyo?"}
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get the current weather for a location",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "description": "City name"
+              }
+            },
+            "required": ["location"]
+          }
+        }
+      }
+    ]
+  }'
+```
