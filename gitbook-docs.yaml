@@ -1,0 +1,11 @@
+$schema: https://api.gitbook.com/gitbook-docs.yaml
+site:
+  title: DOS AI
+  structure:
+    - type: space
+      key: space-dos-ai
+      title: DOS AI
+      path: docs
+      default: true
+      content:
+        directory: ./
