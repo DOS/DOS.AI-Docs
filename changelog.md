@@ -9,6 +9,59 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-09-08
+
+- **feature** [dashboard] Agent Tool Permission & Policy Governance - Admins can now configure per-tool authorization policies (autonomous, approval_required, draft_only) directly in the agent settings; granular permission gates enforce human confirmation before external write mutations
+- **improvement** [gateway] Google Cloud Model Pricing Watch - Gateway price watcher now monitors Google Gemini API model prices in real time, keeping pricing tables synchronized automatically
+
+## 2026-08-31
+
+- **improvement** [dosclaw] Hermes Runtime v2026.8.31 - Advanced the pinned agent container runtime to v2026.8.31 with optimized tool memory isolation and startup time improvements
+
+## 2026-08-28
+
+- **feature** [dosclaw] Crove Post Analytics & Post Metrics - Integrated 12 new social marketing MCP tools including get_social_post_analytics and get_channel_metrics; marketing agents can query impressions, engagement rates, and follower growth
+
+## 2026-08-26
+
+- **feature** [dosclaw] Singapore GCP SEA Cluster Rollout - Deployed high-performance agent cluster gcp-sea in asia-southeast1-b with remote Cloudflare Tunnel ingress at claw-gcp.dos.ai and authenticated Status API at claw-status-gcp.dos.ai for low-latency Southeast Asia traffic
+- **feature** [gateway] Connector Cache Shield - High-concurrency read cache with singleflight de-duplication across commerce and CRM tool queries, preventing upstream rate limit exhaustion during flash sales
+- **feature** [dosclaw] Meta Leads Inbound Webhook - Real-time webhook ingestion for Facebook and Instagram Lead Ads forms; triggers instant AI agent consultations within seconds of lead submission
+
+## 2026-08-22
+
+- **feature** [dosclaw] MISA Enterprise Suite Connectors - Deployed read-only connectors for MISA meInvoice, Inbound E-Invoice, ASP, AMIS Accounting, WeSign, and eSign; financial agents can inspect invoice statuses, tax codes, inventory balances, and signing status securely
+
+## 2026-08-18
+
+- **feature** [dosclaw] Google Workspace Connector - Safe-scope integration for Google Sheets (read/append rows), Google Calendar (event creation with automatic Google Meet video links), and Google Drive document search
+- **feature** [dashboard] Organization-Scoped Projects & Teams - Added multi-tenant team project boundaries, JIT JWT claim parsing for zero-latency role resolution, and scoped agent listings
+
+## 2026-08-16
+
+- **feature** [gateway] Smart Router 5-Step Visual Flow - Upgraded the DOS Smart Router engine with real-time prompt compression, automatic tool-call recovery, and live catalog routing
+- **fix** [dashboard] SSO Fallback Infinite Loop - Fixed duplicate auth check on sso-start that trapped users in a redirect loop on beta environments when falling back to legacy login
+
+## 2026-08-10
+
+- **feature** [dosclaw] Slack & Lark Organization Workspace Connectors - 1-Click Slack App installation with Block Kit interactive UI modals, and Lark Open Platform custom bot event subscriptions for enterprise team chats
+
+## 2026-07-28
+
+- **feature** [dosclaw] Haravan & Shopee Live Commerce Integration - Official OAuth connectors for Haravan Omnichannel and Shopee Open Platform; agents can look up products, check live inventory, and track orders across multi-channel customer chats
+
+## 2026-07-15
+
+- **feature** [gateway] Prompt Compression & Tool-Call Recovery - Built-in semantic prompt compression reduces input token latency by up to 40% while automated tool recovery auto-corrects malformed JSON tool calls from edge LLMs
+
+## 2026-06-28
+
+- **feature** [dosclaw] Zalo OA Follower Sync & Interactive Cards - Connected verified Zalo Official Accounts with interactive action cards, follower profile sync, and seamless human agent handover
+
+## 2026-06-20
+
+- **feature** [gateway] Hot-Reload Provider Catalog - Upstream LLM provider models, pricing, and availability now hot-reload without gateway restarts
+
 ## 2026-06-16
 
 - **feature** [dosclaw] Multi-Platform Commerce Tools - One agent can now serve more than one storefront at once (e.g. KiotViet POS + WooCommerce); product lookups aggregate across every connected platform with platform-qualified codes (`woocommerce:11`, `kiotviet:DH000002`), and stock/order/create-order tools route to the right platform automatically; single-platform agents are unchanged
