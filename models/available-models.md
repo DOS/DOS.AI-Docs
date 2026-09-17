@@ -25,6 +25,8 @@ response = client.chat.completions.create(
 
 | Model | Provider | Context | Input | Output | Model ID |
 | ----- | -------- | ------- | ----- | ------ | -------- |
+| **DeepSeek V4 Pro** | DeepSeek / Alibaba | 1M | $2.40 / 1M | $4.80 / 1M | `deepseek-v4-pro` |
+| **Qwen3.8 27B** | Alibaba | 1M | $0.50 / 1M | $3.00 / 1M | `qwen3.8-27b` |
 | **Llama 4 Maverick 17B-128E** | Meta / DeepInfra | 1M | $0.17 / 1M | $0.66 / 1M | `llama-4-maverick` |
 | **Llama 4 Scout 17B-16E** | Meta / DeepInfra | 640K | $0.11 / 1M | $0.38 / 1M | `llama-4-scout` |
 | **DeepSeek V3** | DeepSeek | 128K | $0.25 / 1M | $0.25 / 1M | `deepseek-v3` |
@@ -50,6 +52,22 @@ Alibaba's Mixture-of-Experts model with 35 billion total parameters and 3 billio
 - **Best for**: General-purpose chat, code generation, reasoning, multilingual tasks
 - **Strengths**: Outstanding cost-efficiency, fast response times, strong multilingual support (especially CJK languages)
 - **Model ID**: `dos-ai`
+
+### DeepSeek V4 Pro
+
+DeepSeek's flagship frontier reasoning model. Features state-of-the-art chain-of-thought mathematical reasoning, competitive with top proprietary models. Supports prompt caching ($0.20/1M cached input).
+
+- **Best for**: Deep mathematical reasoning, complex agent workflows, code generation, multi-step planning
+- **Strengths**: Top-tier reasoning capability, 1M context window, high prompt cache efficiency
+- **Model ID**: `deepseek-v4-pro`
+
+### Qwen3.8 27B
+
+Alibaba's high-efficiency 27B dense model. High instruction-following capability, outstanding multilingual synthesis, and native explicit prompt caching support.
+
+- **Best for**: Multilingual tasks, tool-calling agents, dense reasoning, CJK text processing
+- **Strengths**: Fast inference speed, strong coding benchmarks, 1M context window
+- **Model ID**: `qwen3.8-27b`
 
 ### Llama 4 Maverick 17B-128E
 
