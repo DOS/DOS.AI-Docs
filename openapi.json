@@ -1,0 +1,1578 @@
+{
+  "components": {
+    "responses": {
+      "400BadRequest": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Invalid request parameters or ill-formed JSON body."
+      },
+      "401Unauthorized": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Missing or invalid API key."
+      },
+      "402PaymentRequired": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Insufficient credit balance. Top up at app.dos.ai."
+      },
+      "404NotFound": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Resource not found."
+      },
+      "429RateLimit": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Rate limit or concurrency limit exceeded."
+      },
+      "500InternalError": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "description": "Internal gateway or upstream error."
+      }
+    },
+    "schemas": {
+      "AnthropicMessagesRequest": {
+        "properties": {
+          "max_tokens": {
+            "example": 1024,
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "model": {
+            "example": "claude-3-5-sonnet-20241022",
+            "type": "string"
+          },
+          "stream": {
+            "default": false,
+            "type": "boolean"
+          },
+          "system": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "messages",
+          "max_tokens"
+        ],
+        "type": "object"
+      },
+      "AnthropicMessagesResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "example": "msg_01XFDUDYJgAACrbtxRJaNYVx",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "role": {
+            "example": "assistant",
+            "type": "string"
+          },
+          "type": {
+            "example": "message",
+            "type": "string"
+          },
+          "usage": {
+            "properties": {
+              "input_tokens": {
+                "type": "integer"
+              },
+              "output_tokens": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "BatchObject": {
+        "properties": {
+          "completed_at": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "endpoint": {
+            "example": "/v1/chat/completions",
+            "type": "string"
+          },
+          "error_file_id": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "example": "batch_abc123",
+            "type": "string"
+          },
+          "input_file_id": {
+            "example": "file-abc123",
+            "type": "string"
+          },
+          "object": {
+            "example": "batch",
+            "type": "string"
+          },
+          "output_file_id": {
+            "example": "file-out456",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "validating",
+              "in_progress",
+              "completed",
+              "failed",
+              "expired",
+              "cancelling",
+              "cancelled"
+            ],
+            "example": "in_progress",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChatCompletionChoice": {
+        "properties": {
+          "finish_reason": {
+            "enum": [
+              "stop",
+              "length",
+              "tool_calls",
+              "content_filter"
+            ],
+            "example": "stop",
+            "type": "string"
+          },
+          "index": {
+            "example": 0,
+            "type": "integer"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessage"
+          }
+        },
+        "required": [
+          "index",
+          "message",
+          "finish_reason"
+        ],
+        "type": "object"
+      },
+      "ChatCompletionRequest": {
+        "properties": {
+          "frequency_penalty": {
+            "default": 0,
+            "description": "Number between -2.0 and 2.0. Positive values penalize new tokens based on frequency.",
+            "type": "number"
+          },
+          "max_tokens": {
+            "description": "The maximum number of tokens to generate.",
+            "example": 2048,
+            "type": "integer"
+          },
+          "messages": {
+            "description": "A list of messages comprising the conversation so far.",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array"
+          },
+          "model": {
+            "description": "ID of the model to use (e.g. `dos-ai`, `deepseek/deepseek-chat`, `qwen/qwen-2.5-72b-instruct`).",
+            "example": "dos-ai",
+            "type": "string"
+          },
+          "presence_penalty": {
+            "default": 0,
+            "description": "Number between -2.0 and 2.0. Positive values penalize new tokens based on presence.",
+            "type": "number"
+          },
+          "response_format": {
+            "description": "An object specifying the output format (e.g. {\"type\": \"json_object\"}).",
+            "type": "object"
+          },
+          "stop": {
+            "description": "Up to 4 sequences where the API will stop generating further tokens.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "stream": {
+            "default": false,
+            "description": "If set to true, partial message deltas will be sent as Server-Sent Events.",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 1,
+            "description": "Sampling temperature between 0 and 2.",
+            "example": 0.7,
+            "type": "number"
+          },
+          "tool_choice": {
+            "description": "Controls which (if any) tool is called by the model."
+          },
+          "tools": {
+            "description": "A list of tools the model may call.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "top_p": {
+            "default": 1,
+            "description": "Nucleus sampling probability.",
+            "example": 0.95,
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "messages"
+        ],
+        "type": "object"
+      },
+      "ChatCompletionResponse": {
+        "properties": {
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ChatCompletionChoice"
+            },
+            "type": "array"
+          },
+          "created": {
+            "example": 1711000000,
+            "type": "integer"
+          },
+          "id": {
+            "example": "chatcmpl-9abcdef123456",
+            "type": "string"
+          },
+          "model": {
+            "example": "dos-ai",
+            "type": "string"
+          },
+          "object": {
+            "example": "chat.completion",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageInfo"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "type": "object"
+      },
+      "ChatMessage": {
+        "properties": {
+          "content": {
+            "description": "The contents of the message.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "name": {
+            "description": "An optional name for the participant.",
+            "type": "string"
+          },
+          "role": {
+            "description": "The role of the messages author.",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "type": "string"
+          },
+          "tool_calls": {
+            "description": "The tool calls generated by the model.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "type": "object"
+      },
+      "EmbeddingsRequest": {
+        "properties": {
+          "encoding_format": {
+            "default": "float",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "type": "string"
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "model": {
+            "example": "text-embedding-3-small",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "input"
+        ],
+        "type": "object"
+      },
+      "EmbeddingsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "properties": {
+                "embedding": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "index": {
+                  "example": 0,
+                  "type": "integer"
+                },
+                "object": {
+                  "example": "embedding",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "model": {
+            "example": "text-embedding-3-small",
+            "type": "string"
+          },
+          "object": {
+            "example": "list",
+            "type": "string"
+          },
+          "usage": {
+            "properties": {
+              "prompt_tokens": {
+                "example": 8,
+                "type": "integer"
+              },
+              "total_tokens": {
+                "example": 8,
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "nullable": true,
+                "type": "string"
+              },
+              "message": {
+                "example": "Invalid API key provided.",
+                "type": "string"
+              },
+              "param": {
+                "nullable": true,
+                "type": "string"
+              },
+              "type": {
+                "example": "invalid_request_error",
+                "type": "string"
+              }
+            },
+            "required": [
+              "message",
+              "type"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "FileObject": {
+        "properties": {
+          "bytes": {
+            "example": 1048576,
+            "type": "integer"
+          },
+          "created_at": {
+            "example": 1711000000,
+            "type": "integer"
+          },
+          "filename": {
+            "example": "batch_input.jsonl",
+            "type": "string"
+          },
+          "id": {
+            "example": "file-abc123",
+            "type": "string"
+          },
+          "object": {
+            "example": "file",
+            "type": "string"
+          },
+          "purpose": {
+            "example": "batch",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ImageGenerationRequest": {
+        "properties": {
+          "model": {
+            "example": "flux-1-schnell",
+            "type": "string"
+          },
+          "n": {
+            "default": 1,
+            "type": "integer"
+          },
+          "prompt": {
+            "example": "A cute baby sea otter floating on water in impressionist oil painting style",
+            "type": "string"
+          },
+          "response_format": {
+            "default": "url",
+            "enum": [
+              "url",
+              "b64_json"
+            ],
+            "type": "string"
+          },
+          "size": {
+            "default": "1024x1024",
+            "enum": [
+              "256x256",
+              "512x512",
+              "1024x1024"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "ImageGenerationResponse": {
+        "properties": {
+          "created": {
+            "example": 1711000000,
+            "type": "integer"
+          },
+          "data": {
+            "items": {
+              "properties": {
+                "b64_json": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "KeyResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "is_free_tier": {
+                "description": "Indicates if the account is on a free tier or exhausted.",
+                "example": false,
+                "type": "boolean"
+              },
+              "label": {
+                "description": "Friendly label or name of the API key.",
+                "example": "Production Backend Key",
+                "type": "string"
+              },
+              "limit": {
+                "description": "Hard spending limit in USD (null for pay-as-you-go).",
+                "example": null,
+                "nullable": true,
+                "type": "number"
+              },
+              "limit_remaining": {
+                "description": "Remaining available balance in USD.",
+                "example": 35.75,
+                "type": "number"
+              },
+              "rate_limit": {
+                "properties": {
+                  "interval": {
+                    "example": "10s",
+                    "type": "string"
+                  },
+                  "requests": {
+                    "example": 500,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "usage": {
+                "description": "Total USD spent by this account.",
+                "example": 14.25,
+                "type": "number"
+              }
+            },
+            "required": [
+              "label",
+              "usage",
+              "is_free_tier"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "ModelListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelObject"
+            },
+            "type": "array"
+          },
+          "object": {
+            "example": "list",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object",
+          "data"
+        ],
+        "type": "object"
+      },
+      "ModelObject": {
+        "properties": {
+          "context_length": {
+            "example": 131072,
+            "type": "integer"
+          },
+          "created": {
+            "example": 1711000000,
+            "type": "integer"
+          },
+          "id": {
+            "example": "deepseek/deepseek-chat",
+            "type": "string"
+          },
+          "object": {
+            "example": "model",
+            "type": "string"
+          },
+          "owned_by": {
+            "example": "deepseek",
+            "type": "string"
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/ModelPricing"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "created",
+          "owned_by"
+        ],
+        "type": "object"
+      },
+      "ModelPricing": {
+        "properties": {
+          "completion": {
+            "description": "Price per completion token in USD as a string (OpenRouter format).",
+            "example": "0.00000028",
+            "type": "string"
+          },
+          "image": {
+            "description": "Price per image if applicable.",
+            "example": "0",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Price per prompt token in USD as a string (OpenRouter format).",
+            "example": "0.00000014",
+            "type": "string"
+          },
+          "request": {
+            "description": "Fixed price per request in USD if applicable.",
+            "example": "0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt",
+          "completion"
+        ],
+        "type": "object"
+      },
+      "UsageInfo": {
+        "properties": {
+          "completion_tokens": {
+            "example": 45,
+            "type": "integer"
+          },
+          "cost": {
+            "description": "Actual cost of the request in USD (rounded to 6 decimal places).",
+            "example": 0.000248,
+            "type": "number"
+          },
+          "prompt_tokens": {
+            "example": 120,
+            "type": "integer"
+          },
+          "total_tokens": {
+            "example": 165,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt_tokens",
+          "completion_tokens",
+          "total_tokens"
+        ],
+        "type": "object"
+      },
+      "UserBalanceResponse": {
+        "properties": {
+          "balance": {
+            "description": "Current available balance in USD.",
+            "example": 35.75,
+            "type": "number"
+          },
+          "balance_infos": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "example": "USD",
+                  "type": "string"
+                },
+                "granted_balance": {
+                  "example": "0.00",
+                  "type": "string"
+                },
+                "topped_up_balance": {
+                  "example": "35.75",
+                  "type": "string"
+                },
+                "total_balance": {
+                  "example": "35.75",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "example": "USD",
+            "type": "string"
+          },
+          "data": {
+            "properties": {
+              "remaining_credits": {
+                "example": 35.75,
+                "type": "number"
+              },
+              "total_credits": {
+                "example": 50,
+                "type": "number"
+              },
+              "total_usage": {
+                "example": 14.25,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "invalid_message": {
+            "description": "Error message when balance is exhausted.",
+            "example": "",
+            "type": "string"
+          },
+          "is_active": {
+            "description": "Whether the account has positive balance and can make calls.",
+            "example": true,
+            "type": "boolean"
+          },
+          "is_available": {
+            "description": "DeepSeek-compatible availability flag.",
+            "example": true,
+            "type": "boolean"
+          },
+          "plan": {
+            "example": "pay_as_you_go",
+            "type": "string"
+          },
+          "total_deposited": {
+            "example": 50,
+            "type": "number"
+          },
+          "total_spent": {
+            "example": 14.25,
+            "type": "number"
+          },
+          "unit": {
+            "example": "USD",
+            "type": "string"
+          },
+          "user_id": {
+            "example": "usr_abc123xyz",
+            "type": "string"
+          }
+        },
+        "required": [
+          "is_active",
+          "is_available",
+          "balance",
+          "currency"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "bearerFormat": "dos_sk_...",
+        "description": "Your DOS AI API Key (starts with dos_sk_). Pass in the Authorization header: Bearer dos_sk_...",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "support@dos.ai",
+      "name": "DOS AI Support",
+      "url": "https://dos.ai"
+    },
+    "description": "High-performance, low-cost AI inference and agent platform for open-source and proprietary foundation models.\nFully compatible with OpenAI and Anthropic SDKs, agent frameworks (LangChain, LlamaIndex), and developer tools (Cline, Roo Code, OpenWebUI, Cherry Studio, CC Switch).\n",
+    "title": "DOS AI API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/audio/generations": {
+      "post": {
+        "description": "Generates audio or music from a prompt.",
+        "operationId": "generateAudio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Audio generation result."
+          }
+        },
+        "summary": "Generate audio/music",
+        "tags": [
+          "Media Generation"
+        ]
+      }
+    },
+    "/auth/key": {
+      "get": {
+        "description": "Alias of `/v1/key` for OpenRouter client compatibility.",
+        "operationId": "getAuthKey",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyResponse"
+                }
+              }
+            },
+            "description": "API key metadata and remaining balance."
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Check API key alias",
+        "tags": [
+          "API Keys"
+        ]
+      }
+    },
+    "/batches": {
+      "post": {
+        "description": "Submits a batch job for 50% discounted asynchronous processing.",
+        "operationId": "createBatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "completion_window": {
+                    "example": "24h",
+                    "type": "string"
+                  },
+                  "endpoint": {
+                    "example": "/v1/chat/completions",
+                    "type": "string"
+                  },
+                  "input_file_id": {
+                    "example": "file-abc123xyz",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "input_file_id",
+                  "endpoint"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchObject"
+                }
+              }
+            },
+            "description": "Created batch object."
+          }
+        },
+        "summary": "Create batch",
+        "tags": [
+          "Batches"
+        ]
+      }
+    },
+    "/batches/{id}": {
+      "get": {
+        "description": "Retrieves the current execution status and output file IDs of a batch job.",
+        "operationId": "getBatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchObject"
+                }
+              }
+            },
+            "description": "Batch status object."
+          }
+        },
+        "summary": "Retrieve batch",
+        "tags": [
+          "Batches"
+        ]
+      }
+    },
+    "/batches/{id}/cancel": {
+      "post": {
+        "description": "Cancels an in-progress batch job.",
+        "operationId": "cancelBatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchObject"
+                }
+              }
+            },
+            "description": "Cancelled batch object."
+          }
+        },
+        "summary": "Cancel batch",
+        "tags": [
+          "Batches"
+        ]
+      }
+    },
+    "/chat/completions": {
+      "post": {
+        "description": "Generates a model response for the given chat conversation. Supports streaming (Server-Sent Events), function calling, tool use, JSON schema mode, and per-request cost calculation.\n",
+        "operationId": "createChatCompletion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponse"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "description": "Stream of Server-Sent Events (SSE) ending with data: [DONE]",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful completion response or SSE stream."
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/402PaymentRequired"
+          },
+          "429": {
+            "$ref": "#/components/responses/429RateLimit"
+          },
+          "500": {
+            "$ref": "#/components/responses/500InternalError"
+          }
+        },
+        "summary": "Create chat completion",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/credits": {
+      "get": {
+        "description": "Shorthand alias for `/v1/user/balance`.",
+        "operationId": "getCredits",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBalanceResponse"
+                }
+              }
+            },
+            "description": "User balance and credit information."
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Query user credits",
+        "tags": [
+          "Billing \u0026 Balance"
+        ]
+      }
+    },
+    "/embeddings": {
+      "post": {
+        "description": "Generates embedding vectors representing the input text.",
+        "operationId": "createEmbeddings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingsResponse"
+                }
+              }
+            },
+            "description": "Embeddings response."
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/402PaymentRequired"
+          }
+        },
+        "summary": "Create embeddings",
+        "tags": [
+          "Embeddings"
+        ]
+      }
+    },
+    "/files": {
+      "post": {
+        "description": "Uploads a JSONL file for asynchronous Batch API processing (up to 100MB).",
+        "operationId": "uploadBatchFile",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "purpose": {
+                    "example": "batch",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file",
+                  "purpose"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileObject"
+                }
+              }
+            },
+            "description": "Uploaded file metadata."
+          }
+        },
+        "summary": "Upload batch file",
+        "tags": [
+          "Batches"
+        ]
+      }
+    },
+    "/files/{id}/content": {
+      "get": {
+        "description": "Returns the raw contents of an uploaded or output batch file.",
+        "operationId": "getFileContent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Raw file content (JSONL)."
+          }
+        },
+        "summary": "Retrieve batch file content",
+        "tags": [
+          "Batches"
+        ]
+      }
+    },
+    "/images/generations": {
+      "post": {
+        "description": "Generates an image using open-source or proprietary image models.",
+        "operationId": "generateImage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageGenerationResponse"
+                }
+              }
+            },
+            "description": "Image generation response."
+          }
+        },
+        "summary": "Generate image",
+        "tags": [
+          "Media Generation"
+        ]
+      }
+    },
+    "/key": {
+      "get": {
+        "description": "Returns metadata, limits, and usage for the caller's API key. Compatible with OpenRouter `/api/v1/key` format for Cline, Roo Code, OpenWebUI, and Cherry Studio.\n",
+        "operationId": "getKey",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyResponse"
+                }
+              }
+            },
+            "description": "API key metadata and remaining balance."
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Check API key and quota",
+        "tags": [
+          "API Keys"
+        ]
+      }
+    },
+    "/messages": {
+      "post": {
+        "description": "Sends a structured list of input messages and returns model responses using the Anthropic Messages API format.\n",
+        "operationId": "createAnthropicMessage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnthropicMessagesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnthropicMessagesResponse"
+                }
+              }
+            },
+            "description": "Anthropic message response."
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Create Anthropic message",
+        "tags": [
+          "Anthropic Messages"
+        ]
+      }
+    },
+    "/messages/count_tokens": {
+      "post": {
+        "description": "Counts tokens for an Anthropic-formatted messages payload without charging billing fees.",
+        "operationId": "countMessageTokens",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnthropicMessagesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "input_tokens": {
+                      "example": 128,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Token count result."
+          }
+        },
+        "summary": "Count message tokens",
+        "tags": [
+          "Anthropic Messages"
+        ]
+      }
+    },
+    "/models": {
+      "get": {
+        "description": "Lists the currently available models on DOS AI, including model metadata, context window limits, and OpenRouter-compatible token pricing.\n",
+        "operationId": "listModels",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelListResponse"
+                }
+              }
+            },
+            "description": "List of available model objects."
+          },
+          "500": {
+            "$ref": "#/components/responses/500InternalError"
+          }
+        },
+        "security": [],
+        "summary": "List available models",
+        "tags": [
+          "Models"
+        ]
+      }
+    },
+    "/models/{model_id}": {
+      "get": {
+        "description": "Retrieves details of a specific model by identifier.",
+        "operationId": "retrieveModel",
+        "parameters": [
+          {
+            "description": "The ID of the model to retrieve (e.g. `dos-ai`, `deepseek/deepseek-chat`)",
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelObject"
+                }
+              }
+            },
+            "description": "Model details."
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/500InternalError"
+          }
+        },
+        "security": [],
+        "summary": "Retrieve model",
+        "tags": [
+          "Models"
+        ]
+      }
+    },
+    "/user/balance": {
+      "get": {
+        "description": "Returns credit balance, deposit history, spending, and status. Designed for CC Switch, DeepSeek, and NewAPI/OneAPI client compatibility.\n",
+        "operationId": "getUserBalance",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBalanceResponse"
+                }
+              }
+            },
+            "description": "User balance and credit information."
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Query user balance (GET)",
+        "tags": [
+          "Billing \u0026 Balance"
+        ]
+      },
+      "post": {
+        "description": "POST variant of `/v1/user/balance` for clients that use POST requests for balance checking.",
+        "operationId": "postUserBalance",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBalanceResponse"
+                }
+              }
+            },
+            "description": "User balance and credit information."
+          },
+          "401": {
+            "$ref": "#/components/responses/401Unauthorized"
+          }
+        },
+        "summary": "Query user balance (POST)",
+        "tags": [
+          "Billing \u0026 Balance"
+        ]
+      }
+    },
+    "/videos/generations": {
+      "post": {
+        "description": "Submits a video generation task.",
+        "operationId": "generateVideo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "duration": {
+                    "example": 5,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "prompt"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "example": "processing",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Video task response."
+          }
+        },
+        "summary": "Generate video",
+        "tags": [
+          "Media Generation"
+        ]
+      }
+    },
+    "/videos/generations/{id}": {
+      "get": {
+        "description": "Polls the status and download URL of a generated video.",
+        "operationId": "getVideoStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video generation status and result URL."
+          }
+        },
+        "summary": "Get video status",
+        "tags": [
+          "Media Generation"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Production API v1 Endpoint",
+      "url": "https://api.dos.ai/v1"
+    },
+    {
+      "description": "Production Root Endpoint (for root-level aliases)",
+      "url": "https://api.dos.ai"
+    }
+  ]
+}

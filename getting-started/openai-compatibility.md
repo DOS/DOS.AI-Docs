@@ -70,10 +70,33 @@ curl https://api.dos.ai/v1/chat/completions \
 
 ## Supported endpoints
 
-| Endpoint | Method | Description |
-| --- | --- | --- |
-| `/v1/chat/completions` | POST | Chat completions (single and streaming) |
-| `/v1/models` | GET | List available models |
+| Endpoint | Method | Description | Compatibility |
+| --- | --- | --- | --- |
+| `/v1/chat/completions` | POST | Chat completions (single, streaming, tools, cost calculation) | OpenAI / OpenRouter |
+| `/v1/models` | GET | List available models with `pricing` metadata | OpenAI / OpenRouter |
+| `/v1/models/:model_id` | GET | Retrieve model details and pricing | OpenAI |
+| `/v1/key` | GET | API key inspection, usage, and balance check | OpenRouter |
+| `/v1/user/balance` | GET / POST | Credit balance, deposits, and usage query | DeepSeek / CC Switch |
+| `/v1/credits` | GET | Shorthand credit balance query | NewAPI / OneAPI |
+| `/v1/embeddings` | POST | Vector embeddings | OpenAI |
+| `/v1/files` | POST | Batch file upload (up to 100MB) | OpenAI |
+| `/v1/batches` | POST / GET | Asynchronous batch inference (50% discount) | OpenAI |
+| `/v1/images/generations` | POST | Text-to-image generation | OpenAI |
+| `/v1/videos/generations` | POST / GET | Video generation task creation and polling | DOS AI |
+| `/v1/audio/generations` | POST | Audio and music generation | DOS AI |
+
+## OpenAPI Specification
+
+The complete DOS AI API is documented using the OpenAPI Specification (OAS 3.1.0). You can inspect the specification, import it into Postman/Swagger, or use it to generate typed client SDKs:
+
+* **YAML:** [`https://api.dos.ai/openapi.yaml`](https://api.dos.ai/openapi.yaml)
+* **JSON:** [`https://api.dos.ai/openapi.json`](https://api.dos.ai/openapi.json)
+
+For one-click import into Postman, Swagger UI, or generating Python/TypeScript SDKs, see the [OpenAPI Specification Guide](../api-reference/openapi-spec.md).
+
+## Developer Tools & IDE Integration
+
+DOS AI works out of the box with popular developer coding tools and agent extensions such as **Cline**, **Roo Code**, **OpenWebUI**, **Cherry Studio**, and **CC Switch**. See our [Developer Tools Integration Guide](../guides/dev-tools-integration.md).
 
 ## Supported parameters
 

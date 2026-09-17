@@ -18,6 +18,7 @@
 * [Bring Your Own Key (BYOK)](guides/byok.md)
 * [Guardrails](guides/guardrails.md)
 * [Response Caching](guides/caching.md)
+* [Developer Tools & IDEs](guides/dev-tools-integration.md)
 
 ## Models
 
@@ -61,7 +62,9 @@
 
 ## API Reference
 
+* [OpenAPI Specification](api-reference/openapi-spec.md)
 * [Chat Completions](api-reference/chat-completions.md)
+* [API Key & Balance](api-reference/key.md)
 * [Embeddings](api-reference/embeddings.md)
 * [Media Generation](api-reference/media-generation.md)
 * [Models](api-reference/models.md)
