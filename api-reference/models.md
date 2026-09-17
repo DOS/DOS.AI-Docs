@@ -32,25 +32,34 @@ No request body or query parameters are required.
       "id": "dos-ai",
       "object": "model",
       "created": 1711000000,
-      "owned_by": "dos-ai"
+      "owned_by": "dos-ai",
+      "context_length": 131072,
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.00000015"
+      }
     },
     {
-      "id": "llama-3.3-70b",
+      "id": "deepseek/deepseek-chat",
       "object": "model",
       "created": 1711000000,
-      "owned_by": "dos-ai"
+      "owned_by": "deepseek",
+      "context_length": 131072,
+      "pricing": {
+        "prompt": "0.00000014",
+        "completion": "0.00000028"
+      }
     },
     {
-      "id": "deepseek-v3",
+      "id": "qwen/qwen-2.5-72b-instruct",
       "object": "model",
       "created": 1711000000,
-      "owned_by": "dos-ai"
-    },
-    {
-      "id": "llama-3.1-8b",
-      "object": "model",
-      "created": 1711000000,
-      "owned_by": "dos-ai"
+      "owned_by": "alibaba",
+      "context_length": 131072,
+      "pricing": {
+        "prompt": "0.00000035",
+        "completion": "0.00000035"
+      }
     }
   ]
 }
@@ -65,9 +74,19 @@ No request body or query parameters are required.
 | `data[].id` | string | The model identifier. Use this as the `model` parameter in API requests. |
 | `data[].object` | string | Always `"model"`. |
 | `data[].created` | integer | Unix timestamp of when the model was added. |
-| `data[].owned_by` | string | The organization that owns the model. |
+| `data[].owned_by` | string | The organization that owns or hosts the model. |
+| `data[].context_length` | integer | Maximum context window in tokens. |
+| `data[].pricing` | object | OpenRouter-compatible pricing metadata. |
+| `data[].pricing.prompt` | string | Price per input/prompt token in USD as a string (e.g. `"0.00000014"`). |
+| `data[].pricing.completion` | string | Price per output/completion token in USD as a string (e.g. `"0.00000028"`). |
 
-## Model ID Mapping
+## Retrieve Model (`GET /v1/models/:model_id`)
+
+Retrieve metadata and pricing for a single model:
+
+```bash
+curl https://api.dos.ai/v1/models/dos-ai
+```
 
 The `id` field is the value you use when specifying a model in API requests:
 

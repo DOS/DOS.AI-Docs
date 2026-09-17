@@ -76,7 +76,8 @@ Each message in the `messages` array is an object with the following fields:
   "usage": {
     "prompt_tokens": 12,
     "completion_tokens": 9,
-    "total_tokens": 21
+    "total_tokens": 21,
+    "cost": 0.000003
   }
 }
 ```
@@ -93,10 +94,11 @@ Each message in the `messages` array is an object with the following fields:
 | `choices[].index` | integer | The index of this choice in the list. |
 | `choices[].message` | object | The generated message. |
 | `choices[].finish_reason` | string | Why the model stopped: `"stop"`, `"length"`, `"tool_calls"`, or `"content_filter"`. |
-| `usage` | object | Token usage statistics for the request. |
+| `usage` | object | Token usage statistics and cost calculation for the request. |
 | `usage.prompt_tokens` | integer | Number of tokens in the input prompt. |
 | `usage.completion_tokens` | integer | Number of tokens in the generated response. |
 | `usage.total_tokens` | integer | Total tokens (prompt + completion). |
+| `usage.cost` | number | Actual cost of this completion in USD (rounded to 6 decimal places, compatible with OpenRouter). |
 
 ## Streaming
 
@@ -107,7 +109,7 @@ data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"inde
 
 data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"!"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":9,"total_tokens":21}}
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":9,"total_tokens":21,"cost":0.000003}}
 
 data: [DONE]
 ```
