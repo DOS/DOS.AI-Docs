@@ -2,6 +2,15 @@
 
 DOS AI uses a simple **pay-as-you-go** pricing model. You only pay for the tokens you use, with no minimum commitments, no monthly fees, and no hidden charges.
 
+## Zero-Markup Policy
+
+DOS AI operates on a strict **Zero-Markup Policy**:
+- **100% Provider Published List Price**: We sell cloud and third-party models at exactly 100% of the upstream provider's official published list price.
+- **No Hidden Fees or Surcharges**: You never pay more for tokens than you would by calling providers directly.
+- **Single Transparent Bill**: Consolidate multiple model providers into one unified account, API key, and balance without paying markup penalties.
+
+---
+
 ## Free Tier
 
 Every new account receives **$5.00 in free credits** to get started. This is enough for substantial experimentation and prototyping before you need to add funds.
@@ -15,20 +24,32 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 
 > Free credits do not expire. No credit card is required to start.
 
+---
+
 ## Per-Token Pricing
 
-Pricing is calculated per **1 million tokens** (both input and output).
+Pricing is calculated per **1 million tokens** (input, output, and cached input). All rates are database-driven and strictly follow official provider published prices.
 
-| Model | Input Price (per 1M tokens) | Output Price (per 1M tokens) |
-| ----- | --------------------------- | ---------------------------- |
-| **Qwen3.5-35B-A3B** (default) | $0.15 | $0.15 |
-| **Llama 4 Maverick 17B-128E** | $0.17 | $0.66 |
-| **Llama 4 Scout 17B-16E** | $0.11 | $0.38 |
-| **DeepSeek V3** | $0.25 | $0.25 |
-| **Llama 3.3 70B** | $0.20 | $0.20 |
-| **Llama 3.1 8B** | $0.05 | $0.05 |
+| Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) |
+| :---- | :------- | :------------------- | :-------------------- | :-------------------- |
+| **Qwen3.5-35B-A3B** (default) | Alibaba / Self-hosted | $0.15 | $0.15 | — |
+| **DeepSeek V4 Pro** | DeepSeek / Alibaba | $2.40 | $4.80 | $0.20 |
+| **Qwen3.8 27B** | Alibaba | $0.50 | $3.00 | $0.10 |
+| **Llama 4 Maverick 17B-128E** | Meta / DeepInfra | $0.17 | $0.66 | — |
+| **Llama 4 Scout 17B-16E** | Meta / DeepInfra | $0.11 | $0.38 | — |
+| **DeepSeek V3** | DeepSeek | $0.25 | $0.25 | — |
+| **Llama 3.3 70B** | Meta | $0.20 | $0.20 | — |
+| **Llama 3.1 8B** | Meta | $0.05 | $0.05 | — |
 
-> Prices are DB-driven and may be updated. Check the [dashboard](https://app.dos.ai/models) or `GET /v1/catalog` for the latest pricing.
+> Prices are statically database-driven from Supabase catalog and updated strictly via migrations. Check the [dashboard](https://app.dos.ai/models) or `GET /v1/models` for real-time account pricing.
+
+### Prompt Caching Savings
+
+For supported models (including DeepSeek V4 Pro and Qwen 3.8), repeated prompt prefixes automatically benefit from prompt caching:
+- **DeepSeek V4 Pro**: Cached input tokens are billed at **$0.20 / 1M tokens** (over 90% savings compared to standard input).
+- **Qwen 3.8 27B**: Cached input tokens are billed at **$0.10 / 1M tokens** (80% savings).
+
+---
 
 ### What is a Token?
 
@@ -37,6 +58,8 @@ A token is roughly 3-4 characters of English text, or about 0.75 words. For exam
 - "Hello, world!" = approximately 4 tokens
 - A typical 500-word blog post = approximately 650-700 tokens
 - A full 128K context window = approximately 96,000 words
+
+---
 
 ## How Billing Works
 
@@ -55,16 +78,21 @@ Every API response includes a `usage` object showing exactly how many tokens wer
   "usage": {
     "prompt_tokens": 125,
     "completion_tokens": 320,
-    "total_tokens": 445
+    "total_tokens": 445,
+    "prompt_tokens_details": {
+      "cached_tokens": 100
+    }
   }
 }
 ```
 
 You can also view historical usage and spending breakdowns on the [dashboard](https://app.dos.ai).
 
+---
+
 ## Enterprise & Volume Discounts
 
-For organizations with high-volume needs, we offer custom pricing:
+For organizations with high-volume needs, we offer custom agreements:
 
 - **Volume discounts** for sustained usage above $100/month
 - **Dedicated capacity** with guaranteed throughput
@@ -73,9 +101,7 @@ For organizations with high-volume needs, we offer custom pricing:
 
 Contact us at **support@dos.ai** to discuss enterprise pricing.
 
-## Comparison with Other Providers
-
-DOS AI pricing is designed to be significantly more affordable than major cloud LLM providers, while offering comparable model quality. Our infrastructure runs on dedicated GPUs, allowing us to pass the savings directly to you.
+---
 
 ## FAQ
 
