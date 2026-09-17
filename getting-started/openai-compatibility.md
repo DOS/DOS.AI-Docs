@@ -157,7 +157,7 @@ While we aim for full compatibility, there are a few differences to be aware of:
 | Image generation | Not available | Use a dedicated image generation service |
 | Audio / TTS / STT | Not available | Not on the roadmap |
 | Assistants API | Not available | Use chat completions directly |
-| Batch API | Not yet available | Coming soon |
+| Batch API | Supported | Full compatibility for `/v1/files` and `/v1/batches` at 50% discount |
 
 ## Migration checklist
 

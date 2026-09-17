@@ -65,6 +65,7 @@
 * [Embeddings](api-reference/embeddings.md)
 * [Media Generation](api-reference/media-generation.md)
 * [Models](api-reference/models.md)
+* [Batches](api-reference/batches.md)
 
 ## DOSafe
 
