@@ -9,9 +9,9 @@ The DOS.AI Batch API is **100% OpenAI-compatible**, so you can use existing Open
 ## Why Use the Batch API?
 
 - **50% Cost Savings**: All batch requests are charged at exactly 50% of the standard retail token price.
-- **Dual-Engine Processing**:
-  - **Self-Hosted (`dos`)**: Processed during local GPU idle capacity windows.
-  - **Cloud Relay (Alibaba Cloud DeepSeek & Qwen)**: Scheduled during provider off-peak windows (**00:00 – 10:00 GMT+8**), giving you reliable, low-cost processing for frontier open-weights models.
+- **Unified Provider Marketplace**:
+  - **Provider `dos` (`dos`)**: Processed during spare GPU capacity troughs.
+  - **Provider `alibaba` (DeepSeek & Qwen)**: Scheduled during provider off-peak windows (**00:00 – 10:00 GMT+8**), giving you reliable, low-cost processing for frontier open-weights models.
 - **Independent Limits**: Batch volume does not consume your real-time interactive rate limits.
 - **Resilient & Fault-Tolerant**: Individual request failures (e.g. invalid formatting or context length exceedance) are recorded per line in the output file without failing the rest of the batch.
 
@@ -21,7 +21,7 @@ The DOS.AI Batch API is **100% OpenAI-compatible**, so you can use existing Open
 
 | Model ID | Provider | Description | Discount |
 | :--- | :--- | :--- | :---: |
-| `dos` (or `dos-ai`) | Self-Hosted | DOS.AI's flagship self-hosted model | **-50%** |
+| `dos` (or `dos-ai`) | DOS | DOS.AI's flagship model | **-50%** |
 | `deepseek-v4-pro` | Alibaba Cloud | Frontier reasoning and coding model | **-50%** |
 | `deepseek-v4.1-flash` | Alibaba Cloud | Ultra-fast, cost-effective general intelligence | **-50%** |
 | `deepseek-v4` | Alibaba Cloud | Flagship DeepSeek V4 foundation model | **-50%** |
