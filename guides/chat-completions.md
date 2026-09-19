@@ -331,7 +331,7 @@ def chat_with_retry(payload, max_retries=3):
 |----------|-------------|
 | `dos-ai` | Qwen3.5-35B-A3B -- fast, efficient, recommended for most tasks. |
 
-Check the [Models](/api-reference/models.md) endpoint for the current list of available models.
+Check the [Models](../api-reference/models.md) endpoint for the current list of available models.
 
 ## Next Steps
 

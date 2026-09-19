@@ -51,11 +51,14 @@ OpenAI-compatible API with smart routing, streaming, function calling, and struc
 
 Deploy AI agents powered by [OpenClaw](https://github.com/nicejoy/openclaw) with multi-channel messaging (Telegram, Zalo OA, Messenger, Discord, Slack, WhatsApp, Lark). Each agent runs in its own isolated container with persistent workspace, memory, tools, and 5,000+ installable skills.
 
-- [Agent Architecture & Runtime](agents/architecture.md)
-- [Workspace Files & Prompt Contract](agents/workspace-files.md)
-- [Tools, MCP Connectors & Action Invariants](agents/tools-and-actions.md)
-- [Channels Overview](channels/overview.md)
-- [Connectors Directory](connectors/overview.md)
+Explore the complete documentation in the **DOSClaw Agents** tab, or jump directly:
+
+- [DOSClaw Overview](dosclaw/README.md)
+- [Agent Architecture & Runtime](dosclaw/architecture.md)
+- [Workspace Files & Prompt Contract](dosclaw/workspace-files.md)
+- [Tools, MCP Connectors & Action Invariants](dosclaw/tools-and-actions.md)
+- [Channels Overview](dosclaw/channels/overview.md)
+- [Connectors Directory](dosclaw/connectors/overview.md)
 
 ### DOSafe
 

@@ -4,8 +4,14 @@ site:
   structure:
     - type: space
       key: space-dos-ai
-      title: DOS AI
+      title: API & Models
       path: docs
       default: true
       content:
         directory: ./
+    - type: space
+      key: space-dosclaw
+      title: DOSClaw Agents
+      path: dosclaw
+      content:
+        directory: ./dosclaw
