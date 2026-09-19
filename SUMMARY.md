@@ -25,6 +25,12 @@
 * [Available Models](models/available-models.md)
 * [Pricing](models/pricing.md)
 
+## DOSClaw Agents
+
+* [Architecture & Runtime](agents/architecture.md)
+* [Workspace Files & Prompts](agents/workspace-files.md)
+* [Tools & Action Invariants](agents/tools-and-actions.md)
+
 ## Plugins & Connectors
 
 * [Overview](connectors/overview.md)
