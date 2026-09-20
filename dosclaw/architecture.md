@@ -17,7 +17,7 @@ DOSClaw adopts a **standalone container per user agent** model. Unlike monolithi
                  Cloudflare Zero Trust Tunnel ──┼── Bearer-Authed Control Plane
                                                 ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Docker Host Fleet (Mumbai Lambda / GCP Singapore / Local Canary)                                  │
+│ Docker Host Fleet (GCP Singapore VM dos / Beta VM dosclaw-beta)                                    │
 │                                                                                                   │
 │   ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │   │ Node.js Status API (:18090)                                                                │  │
@@ -46,7 +46,7 @@ DOSClaw adopts a **standalone container per user agent** model. Unlike monolithi
    - The Go API Gateway communicates with remote Docker hosts through a dedicated, authenticated **Status API**.
    - No complex intermediary cluster managers (no HiClaw Manager, Matrix sync servers, or Higress dependencies).
 3. **Multi-Backend Routing (`BackendRouter`)**:
-   - The API Gateway transparently routes operations to the target host based on the agent's assigned backend (`mumbai` for production fleet, `gcp-sea` for Singapore capacity, `local` for beta/canary smoke tests).
+   - The API Gateway transparently routes operations to the target host based on the agent's assigned backend (`gcp-sea` for the primary Singapore production fleet, `local` for the beta fleet on `dosclaw-beta`, with `mumbai` retired).
 
 ---
 

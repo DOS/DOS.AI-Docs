@@ -19,7 +19,7 @@ Each DOSClaw agent runs inside a dedicated, isolated Docker container powered by
                  Cloudflare Zero Trust Tunnel ──┼── Bearer-Authed Control Plane
                                                 ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Docker Host Fleet (Mumbai Lambda / GCP Singapore / Local Canary)                                  │
+│ Docker Host Fleet (GCP Singapore VM dos / Beta VM dosclaw-beta)                                    │
 │                                                                                                   │
 │   ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │   │ Node.js Status API (:18090)                                                                │  │
