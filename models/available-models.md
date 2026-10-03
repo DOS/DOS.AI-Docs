@@ -21,7 +21,7 @@ When a request requires advanced multi-step reasoning, complex coding, or autono
 | :------- | :---- | :----------------- | :------ | :------------- | :-------------- | :-------- |
 | **1 (Primary)** | **GPT-6 Luna** | OpenAI / Azure Foundry | 1.05M | **$0.10** | **$0.50** | Frontier efficiency, fast tool calling, agent loops |
 | **2** | **Gemini 3.8 Flash** | Google Cloud | 1M | $0.79 | $3.94 | Sub-second TTFT, multimodal, massive context |
-| **3** | **Qwen 3.8 Max** | Alibaba Cloud | 1M | $1.87 | $5.62 | Complex bilingual logic, deep mathematical reasoning |
+| **3** | **Qwen 3.8 Max** | Alibaba Cloud | 1M | $2.00 | $6.00 | Complex bilingual logic, deep mathematical reasoning |
 
 *Note: Simple and Medium tier requests remain on the in-house self-hosted model (`dos`) to optimize speed and cost.*
 
@@ -38,7 +38,7 @@ When a request requires advanced multi-step reasoning, complex coding, or autono
 | **Qwen 3.8 27B Dense** | DOS.AI (Singapore GPU) | 256K | **$0.07** | **$0.50** | In-house low-latency agent loops, sub-250ms TTFT |
 | **GPT-6 Luna** | OpenAI / Azure | 1.05M | **$0.10** | **$0.50** | Complex reasoning, structured outputs, 1.05M context |
 | **Gemini 3.8 Flash** | Google Cloud | 1M | **$0.79** | **$3.94** | Ultra-fast multimodal processing, sub-second TTFT |
-| **DeepSeek V4.1 Flash** | DeepSeek / Alibaba | 128K | **$0.14** | **$0.28** | MoE high-throughput reasoning and coding logic |
+| **DeepSeek V4.1 Flash** | DeepSeek / Alibaba | 128K | **$0.30** | **$1.20** | MoE high-throughput reasoning and coding logic |
 
 #### High-Availability & Circuit Breakers
 Requests to `model: "dos"` execute on the in-house Singapore GPU cluster with automatic multi-provider circuit breaker failover defined in the Supabase catalog, ensuring 99.99% continuity during upstream provider maintenance.
@@ -53,10 +53,11 @@ Requests to `model: "dos"` execute on the in-house Singapore GPU cluster with au
 | **GPT-6 Sol** | OpenAI / Azure | 1.05M | $2.00 | $10.00 | `gpt-6-sol` | Frontier flagship, deep architectural reasoning |
 | **GPT-6 Astra** | OpenAI | 1.05M | $5.00 | $25.00 | `gpt-6-astra` | Next-gen multistep engineering, async tools |
 | **Gemini 3.8 Flash** | Google Cloud | 1M | $0.79 | $3.94 | `gemini-3.8-flash` | Hybrid reasoning, vision, sub-second TTFT |
-| **DeepSeek V4.1 Flash** | Alibaba / DeepSeek | 1M | $0.14 | $0.28 | `deepseek-v4.1-flash` | MoE, controllable thinking, 1M context |
+| **DeepSeek V4.1 Flash** | Alibaba / DeepSeek | 1M | $0.30 | $1.20 | `deepseek-v4.1-flash` | MoE, controllable thinking, 1M context |
 | **DeepSeek V4 Pro** | DeepSeek / Alibaba | 1M | $2.40 | $4.80 | `deepseek-v4-pro` | Mathematical reasoning, complex agent workflows |
+| **Qwen 3.8 Flash** | Alibaba Cloud | 1M | $0.15 | $0.47 | `qwen3.8-flash` | Ultra-fast lightweight reasoning, high-throughput chat |
 | **Qwen 3.8 27B** | Alibaba Cloud | 1M | $0.50 | $3.00 | `qwen3.8-27b` | Dense reasoning, tool calling, explicit caching |
-| **Qwen 3.8 Max** | Alibaba Cloud | 1M | $1.87 | $5.62 | `qwen3.8-max` | Multilingual reasoning, complex logic |
+| **Qwen 3.8 Max** | Alibaba Cloud | 1M | $2.00 | $6.00 | `qwen3.8-max` | Multilingual reasoning, complex logic |
 | **Claude Sonnet 5** | Anthropic | 1M | $3.00 | $15.00 | `claude-sonnet-5` | Enterprise agentic coding, 128K output |
 | **Claude Opus 5** | Anthropic | 1M | $15.00 | $75.00 | `claude-opus-5` | Flagship reasoning, long-horizon tasks |
 
