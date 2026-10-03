@@ -18,7 +18,7 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 | Model | Approximate Free Usage |
 | :---- | :--------------------- |
 | **GPT-6 Luna** | ~50 million input tokens (or 10M output tokens) |
-| **Qwen 3.8 27B Dense** (`dos`) | ~33 million tokens |
+| **DOS Curated Pool (`dos`)** | ~71 million input tokens (or 10M output tokens) |
 | **DeepSeek V4.1 Flash** | ~35 million tokens |
 | **Gemini 3.8 Flash** | ~6.3 million tokens |
 
@@ -30,12 +30,12 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 
 Pricing is calculated per **1 million tokens** (input, output, and cached input). All rates are statically database-driven from the Supabase catalog (`dosai.model_pricing`) and strictly follow official provider published prices.
 
-### Smart Router & Self-Hosted Models
+### Smart Router & Curated Platform Models
 
 | Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) | Billing Policy |
 | :---- | :------- | :------------------- | :-------------------- | :-------------------- | :------------- |
 | **Smart Router (`auto`)** | Dynamic | Variable | Variable | Variable | Billed at target model's exact rate |
-| **Qwen 3.8 27B Dense (`dos`)** | Self-hosted (Singapore) | $0.15 | $0.15 | — | Stable fixed rate |
+| **DOS Curated Pool (`dos`)** | DOS.AI (Singapore cluster) | **$0.07** | **$0.50** | — | Wholesale zero markup fixed rate |
 
 ### Frontier & Partner Cloud Models
 
