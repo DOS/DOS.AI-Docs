@@ -18,8 +18,8 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 | Model | Approximate Free Usage |
 | :---- | :--------------------- |
 | **GPT-6 Luna** | ~50 million input tokens (or 10M output tokens) |
-| **DOS Curated Pool (`dos`)** | ~71 million input tokens (or 10M output tokens) |
-| **DeepSeek V4.1 Flash** | ~35 million tokens |
+| **DOS Curated Endpoint (`dos`)** | ~71 million input tokens (or 10M output tokens) |
+| **DeepSeek V4.1 Flash** | ~16.6 million input tokens (or 4.1M output tokens) |
 | **Gemini 3.8 Flash** | ~6.3 million tokens |
 
 > Free credits do not expire. No credit card is required to start.
@@ -35,7 +35,9 @@ Pricing is calculated per **1 million tokens** (input, output, and cached input)
 | Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) | Billing Policy |
 | :---- | :------- | :------------------- | :-------------------- | :-------------------- | :------------- |
 | **Smart Router (`auto`)** | Dynamic | Variable | Variable | Variable | Billed at target model's exact rate |
-| **DOS Curated Pool (`dos`)** | DOS.AI (Singapore cluster) | **$0.07** | **$0.50** | — | Wholesale zero markup fixed rate |
+| **DOS Curated Endpoint (`dos`)** | DOS.AI (Singapore cluster) | **$0.07** | **$0.50** | — | Wholesale fixed rate (Singapore GPU default) |
+
+*Note: Calls targeting `model: "dos"` execute on the Singapore GPU cluster at the fixed $0.07/$0.50 rate. Direct calls to individual curated engines (e.g. `gpt-6-luna`, `gemini-3.8-flash`, `deepseek-v4.1-flash`) or auto-escalations via `auto` are billed at each target engine's exact published rate.*
 
 ### Frontier & Partner Cloud Models
 
@@ -45,9 +47,10 @@ Pricing is calculated per **1 million tokens** (input, output, and cached input)
 | **GPT-6 Sol** | OpenAI / Azure | $2.00 | $10.00 | $0.20 | 1.05M |
 | **GPT-6 Astra** | OpenAI | $5.00 | $25.00 | $0.50 | 1.05M |
 | **Gemini 3.8 Flash** | Google Cloud | $0.79 | $3.94 | $0.20 | 1M |
-| **DeepSeek V4.1 Flash** | Alibaba / DeepSeek | $0.14 | $0.28 | $0.035 | 1M |
+| **DeepSeek V4.1 Flash** | Alibaba / DeepSeek | $0.30 | $1.20 | $0.03 | 1M |
+| **Qwen 3.8 Flash** | Alibaba Cloud | $0.15 | $0.47 | $0.016 | 1M |
 | **Qwen 3.8 27B** | Alibaba Cloud | $0.50 | $3.00 | $0.10 | 1M |
-| **Qwen 3.8 Max** | Alibaba Cloud | $1.87 | $5.62 | $0.47 | 1M |
+| **Qwen 3.8 Max** | Alibaba Cloud | $2.00 | $6.00 | $0.25 | 1M |
 | **Claude Sonnet 5** | Anthropic | $3.00 | $15.00 | $0.30 | 1M |
 | **Claude Opus 5** | Anthropic | $15.00 | $75.00 | $1.50 | 1M |
 
@@ -57,8 +60,10 @@ Pricing is calculated per **1 million tokens** (input, output, and cached input)
 
 For supported models (including GPT-6 series, DeepSeek V4.1, and Qwen 3.8), repeated prompt prefixes automatically benefit from prompt caching:
 - **GPT-6 Luna**: Cached input tokens are billed at **$0.01 / 1M tokens** (90% savings).
+- **Qwen 3.8 Flash**: Cached input tokens are billed at **$0.016 / 1M tokens** (89% savings).
 - **Qwen 3.8 27B**: Cached input tokens are billed at **$0.10 / 1M tokens** (80% savings).
-- **DeepSeek V4.1 Flash**: Cached input tokens are billed at **$0.035 / 1M tokens** (75% savings).
+- **Qwen 3.8 Max**: Cached input tokens are billed at **$0.25 / 1M tokens** (87.5% savings).
+- **DeepSeek V4.1 Flash**: Cached input tokens are billed at **$0.03 / 1M tokens** (90% savings).
 
 ---
 
