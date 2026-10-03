@@ -29,17 +29,19 @@ When a request requires advanced multi-step reasoning, complex coding, or autono
 
 ## Model Catalog
 
-### Self-Hosted (Lowest Latency & In-House Cluster)
+### Curated Platform Models & In-House Cluster (`dos`)
 
-| Model | Architecture | Context | Input | Output | Model ID | Primary Region |
-| :---- | :----------- | :------ | :---- | :----- | :------- | :------------- |
-| **Qwen 3.8 27B Dense** | 27B Dense | 32K | $0.15 / 1M | $0.15 / 1M | `dos`, `dos-ai` | Singapore (`asia-southeast1-b`) |
+`dos` (or `dos-ai`) is DOS.AI's curated meta-model and intelligent execution endpoint, pre-tuned for DOSClaw agent workflows, ReAct loops, and native tool-calling with zero markup. It provides a **Curated Model Pool** of pre-selected, cost-efficient engines:
 
-#### High-Availability Emergency Failover
-Self-hosted models feature automated circuit breaker protection with multi-cloud emergency failover:
-- **Primary Execution**: Self-hosted vLLM engine on VM `dos` (RTX Pro 6000 Ada / H100 with NVMe).
-- **Emergency Priority 1 (Cloudflare Workers AI)**: If vLLM experiences a timeout or 5xx outage, the API Gateway immediately reroutes to Cloudflare Workers AI (`@cf/qwen/qwen3.8-27b`) to absorb the outage with zero downtime.
-- **Emergency Priority 2 (Alibaba Cloud Model Studio)**: If Cloudflare is also unreachable, secondary failover routes to Alibaba Cloud.
+| Engine | Provider | Context | Input Price (1M) | Output Price (1M) | Best For |
+| :----- | :------- | :------ | :--------------- | :---------------- | :------- |
+| **Qwen 3.8 27B Dense** | DOS.AI (Singapore GPU) | 256K | **$0.07** | **$0.50** | In-house low-latency agent loops, sub-250ms TTFT |
+| **GPT-6 Luna** | OpenAI / Azure | 1.05M | **$0.10** | **$0.50** | Complex reasoning, structured outputs, 1.05M context |
+| **Gemini 3.8 Flash** | Google Cloud | 1M | **$0.79** | **$3.94** | Ultra-fast multimodal processing, sub-second TTFT |
+| **DeepSeek V4.1 Flash** | DeepSeek / Alibaba | 128K | **$0.14** | **$0.28** | MoE high-throughput reasoning and coding logic |
+
+#### High-Availability & Circuit Breakers
+Requests to `model: "dos"` execute on the in-house Singapore GPU cluster with automatic multi-provider circuit breaker failover defined in the Supabase catalog, ensuring 99.99% continuity during upstream provider maintenance.
 
 ---
 
@@ -82,11 +84,11 @@ OpenAI's latest cost-efficient frontier reasoning model. Features state-of-the-a
 - **Strengths**: 1.05M context window, exceptional price-to-performance, Azure Foundry low-latency hosting
 - **Model ID**: `gpt-6-luna`
 
-### Qwen 3.8 27B Dense (`dos`)
-The foundational in-house model driving DOSClaw agents. Hosted on dedicated GPUs in Singapore, offering sub-250ms TTFT with consistent low-latency response times.
+### DOS Curated Meta-Model (`dos`)
+DOS.AI's curated meta-model pre-tuned for DOSClaw agent workflows, ReAct loops, and low-latency execution. Served from our in-house Singapore GPU cluster (sub-250ms TTFT) with unified zero-markup billing.
 
 - **Best for**: Agent turn executions, customer support, fast interactive chat, CJK bilingual tasks
-- **Strengths**: Sub-250ms latency, high instruction following, automated Cloudflare emergency failover
+- **Strengths**: Sub-250ms TTFT, 256K context, pre-selected 4-engine curated pool, automatic catalog circuit breakers
 - **Model ID**: `dos`, `dos-ai`
 
 ### Gemini 3.8 Flash
