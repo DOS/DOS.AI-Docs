@@ -78,6 +78,20 @@ See the [Embeddings API reference](../api-reference/embeddings.md) for request/r
 
 ---
 
+### Image Generation Models
+
+DOS.AI supports specialized text-to-image and visual generation models for autonomous agents, MCP marketing tools (`generate_marketing_image`), and direct visual generation:
+
+| Model | Provider | Resolution / Tiers | Billing Unit | Model ID | Primary Use Case |
+| :---- | :------- | :----------------- | :----------- | :------- | :--------------- |
+| **Wan 2.2 T2I Flash** | Alibaba Cloud | Up to 1024×1024 | Per Image ($0.08) | `wan2.2-t2i-flash` | High-speed creative marketing visual generation, banners |
+| **Gemini Image (Nano Banana 2)** | Google Cloud | 1K / 2K | Variable Tokens (Input + Output) | `nano-banana-2` | Multimodal instruction-following, bilingual marketing copy |
+| **Nano Banana Pro** | Google Cloud | 1K / 2K | Variable Tokens (Input + Output) | `nano-banana-pro` | High-fidelity photorealistic rendering and design assets |
+
+> **Agent Model Priority Rule**: In DOSClaw, image generation models can be included in an agent's ordered **Model Priority list** (`model_chain`) to designate preferred visual tool routes. However, an image model **cannot** be assigned as the Primary Chat Model (`model_chain[0]`), which strictly requires conversational chat capabilities.
+
+---
+
 ## Model Details
 
 ### GPT-6 Luna

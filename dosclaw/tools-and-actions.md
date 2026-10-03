@@ -31,6 +31,7 @@ While the documentation file `TOOLS.md` has been retired, **Tools (Function Call
 Injected dynamically via `openclaw.json`. These connect the agent to DOS.AI's managed infrastructure:
 - **`search_knowledge`**: Hybrid vector + keyword search over the merchant's live knowledge base (Supabase pgvector), synced automatically with Google Sheets or CSV uploads.
 - **Platform Connectors**: E-commerce tools (Shopee, TikTok Shop, Haravan), CRM tools (HubSpot, Salesforce), and Invoicing tools (MISA, FinOne).
+- **Marketing & Media Tools**: Social posting and media synthesis tools (`generate_marketing_image`, `create_social_post`, `prepare_marketing_review`). When an agent generates visual assets, the API Gateway dynamically resolves image-capable models from the agent's configured **Model Priority chain** (`model_chain`), enforcing atomic credit holds, rate-limiting on remote social destinations, and zero-markup token settlement.
 - **Custom Hardware/IoT Actions**: Dedicated tools for device control (e.g. `reset_speaker` / `reset_device`).
 
 ### 2. OpenClaw Core Runtime Tools
