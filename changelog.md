@@ -11,6 +11,8 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ## 2026-10-03
 
+- **feature** [gateway] Smart Router Escalation Repointed to GPT-6 Luna - Upgraded the auto router's primary escalation target to `gpt-6-luna` ($0.10 input / $0.50 output per million, 1.05M context window) on Azure OpenAI Foundry (covered by $9K CMC credits), reducing complex request routing cost by >50% compared to legacy `gpt-5.6-luna`
+- **improvement** [inference] Emergency Failover Prioritizes Cloudflare Workers AI - When the self-hosted vLLM GPU engine on VM `dos` experiences timeout or 5xx outage, the gateway hoists Cloudflare Workers AI (`@cf/qwen/qwen3.8-27b`) to priority #1 ahead of commercial providers (Alibaba Cloud) to utilize platform credits and preserve gross margins during outages
 - **feature** [dashboard] Billing History Table Standardization & Direct Stripe Receipt/Invoice View - Upgraded the transaction history table to a cohesive rounded card container adhering to DOS.AI UI brand conventions; users can view and download official Stripe hosted invoices and payment receipts with 1 click across `in_`, `pi_`, `ch_`, and `cs_` transactions
 - **improvement** [dashboard] Ledger Privacy Protection & 7-Locale Internationalization - Sanitized transaction descriptions in user ledger with automated UUID redaction (`[redacted]`) for referee IDs in referral rewards, and standardized all transaction types and descriptions across 7 languages (EN, VI, ID, JA, KO, TH, ZH)
 
