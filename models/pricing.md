@@ -18,8 +18,8 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 | Model | Approximate Free Usage |
 | :---- | :--------------------- |
 | **GPT-6 Luna** | ~50 million input tokens (or 10M output tokens) |
-| **DOS Curated Pool (`dos`)** | ~71 million input tokens (or 10M output tokens) |
-| **DeepSeek V4.1 Flash** | ~35 million tokens |
+| **DOS Curated Endpoint (`dos`)** | ~71 million input tokens (or 10M output tokens) |
+| **DeepSeek V4.1 Flash** | ~16.6 million input tokens (or 4.1M output tokens) |
 | **Gemini 3.8 Flash** | ~6.3 million tokens |
 
 > Free credits do not expire. No credit card is required to start.
@@ -35,7 +35,9 @@ Pricing is calculated per **1 million tokens** (input, output, and cached input)
 | Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) | Billing Policy |
 | :---- | :------- | :------------------- | :-------------------- | :-------------------- | :------------- |
 | **Smart Router (`auto`)** | Dynamic | Variable | Variable | Variable | Billed at target model's exact rate |
-| **DOS Curated Pool (`dos`)** | DOS.AI (Singapore cluster) | **$0.07** | **$0.50** | — | Wholesale zero markup fixed rate |
+| **DOS Curated Endpoint (`dos`)** | DOS.AI (Singapore cluster) | **$0.07** | **$0.50** | — | Wholesale fixed rate (Singapore GPU default) |
+
+*Note: Calls targeting `model: "dos"` execute on the Singapore GPU cluster at the fixed $0.07/$0.50 rate. Direct calls to individual curated engines (e.g. `gpt-6-luna`, `gemini-3.8-flash`, `deepseek-v4.1-flash`) or auto-escalations via `auto` are billed at each target engine's exact published rate.*
 
 ### Frontier & Partner Cloud Models
 

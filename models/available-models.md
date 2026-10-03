@@ -31,14 +31,16 @@ When a request requires advanced multi-step reasoning, complex coding, or autono
 
 ### Curated Platform Models & In-House Cluster (`dos`)
 
-`dos` (or `dos-ai`) is DOS.AI's curated meta-model and intelligent execution endpoint, pre-tuned for DOSClaw agent workflows, ReAct loops, and native tool-calling with zero markup. It provides a **Curated Model Pool** of pre-selected, cost-efficient engines:
+`dos` (or `dos-ai`) is DOS.AI's curated meta-model and intelligent execution endpoint, pre-tuned for DOSClaw agent workflows, ReAct loops, and native tool-calling with zero markup. Requests sent to `model: "dos"` default to the self-hosted Singapore GPU cluster (`qwen3.8-27b` at **$0.07** input / **$0.50** output per 1M tokens).
+
+The platform also provides a **Curated Model Pool** of pre-selected, cost-efficient engines that can be invoked directly at each engine's exact wholesale list rate:
 
 | Engine | Provider | Context | Input Price (1M) | Output Price (1M) | Best For |
 | :----- | :------- | :------ | :--------------- | :---------------- | :------- |
 | **Qwen 3.8 27B Dense** | DOS.AI (Singapore GPU) | 256K | **$0.07** | **$0.50** | In-house low-latency agent loops, sub-250ms TTFT |
 | **GPT-6 Luna** | OpenAI / Azure | 1.05M | **$0.10** | **$0.50** | Complex reasoning, structured outputs, 1.05M context |
 | **Gemini 3.8 Flash** | Google Cloud | 1M | **$0.79** | **$3.94** | Ultra-fast multimodal processing, sub-second TTFT |
-| **DeepSeek V4.1 Flash** | DeepSeek / Alibaba | 128K | **$0.30** | **$1.20** | MoE high-throughput reasoning and coding logic |
+| **DeepSeek V4.1 Flash** | DeepSeek / Alibaba | 1M | **$0.30** | **$1.20** | MoE high-throughput reasoning and coding logic |
 
 #### High-Availability & Circuit Breakers
 Requests to `model: "dos"` execute on the in-house Singapore GPU cluster with automatic multi-provider circuit breaker failover defined in the Supabase catalog, ensuring 99.99% continuity during upstream provider maintenance.
