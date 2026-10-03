@@ -88,6 +88,14 @@ Every API response includes a `usage` object showing exactly how many tokens wer
 
 You can also view historical usage and spending breakdowns on the [dashboard](https://app.dos.ai).
 
+## Billing History & Receipts
+
+You can view your complete transaction history at any time on the [Billing Dashboard](https://app.dos.ai/billing):
+
+- **Comprehensive Ledger**: View all credit purchases, signup bonuses, referral rewards, refunds, and usage charges in a unified, sortable table.
+- **Direct Stripe Receipts & Invoices**: For any card deposit, subscription, or automated recharge processed via Stripe, click the **Receipt / Invoice** button to instantly open official Stripe receipts and hosted invoice PDFs in a secure new tab.
+- **Privacy Protection**: Referral commissions automatically redact internal referee identifiers (`[redacted]`) to safeguard team and member privacy.
+
 ---
 
 ## Enterprise & Volume Discounts
@@ -124,3 +132,8 @@ Yes. You can configure monthly spending alerts and hard limits in the dashboard 
 ### Are there any hidden fees?
 
 No. You pay only for the tokens you consume. There are no platform fees, no per-request fees, and no bandwidth charges.
+
+### How can I get a tax receipt or VAT invoice?
+
+For international credit card payments processed via Stripe, you can access official Stripe payment receipts and hosted invoices directly from the **Billing History** table at [app.dos.ai/billing](https://app.dos.ai/billing). For corporate billing or Vietnamese tax invoices (e-invoicing via MISA meInvoice), configure your company legal name, tax code, and registered billing address under [Billing Preferences](https://app.dos.ai/billing?tab=tax).
+

@@ -9,6 +9,11 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-10-03
+
+- **feature** [dashboard] Billing History Table Standardization & Direct Stripe Receipt/Invoice View - Upgraded the transaction history table to a cohesive rounded card container adhering to DOS.AI UI brand conventions; users can view and download official Stripe hosted invoices and payment receipts with 1 click across `in_`, `pi_`, `ch_`, and `cs_` transactions
+- **improvement** [dashboard] Ledger Privacy Protection & 7-Locale Internationalization - Sanitized transaction descriptions in user ledger with automated UUID redaction (`[redacted]`) for referee IDs in referral rewards, and standardized all transaction types and descriptions across 7 languages (EN, VI, ID, JA, KO, TH, ZH)
+
 ## 2026-09-08
 
 - **feature** [dashboard] Agent Tool Permission & Policy Governance - Admins can now configure per-tool authorization policies (autonomous, approval_required, draft_only) directly in the agent settings; granular permission gates enforce human confirmation before external write mutations
