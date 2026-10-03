@@ -5,7 +5,7 @@ DOS AI uses a simple **pay-as-you-go** pricing model. You only pay for the token
 ## Zero-Markup Policy
 
 DOS AI operates on a strict **Zero-Markup Policy**:
-- **100% Provider Published List Price**: We sell cloud and third-party models at exactly 100% of the upstream provider's official published list price.
+- **100% Provider Published List Price**: We sell cloud and third-party models at exactly 100% of the upstream provider's official published list price (`markup_pct = 0`).
 - **No Hidden Fees or Surcharges**: You never pay more for tokens than you would by calling providers directly.
 - **Single Transparent Bill**: Consolidate multiple model providers into one unified account, API key, and balance without paying markup penalties.
 
@@ -16,11 +16,11 @@ DOS AI operates on a strict **Zero-Markup Policy**:
 Every new account receives **$5.00 in free credits** to get started. This is enough for substantial experimentation and prototyping before you need to add funds.
 
 | Model | Approximate Free Usage |
-| ----- | ---------------------- |
-| Qwen3.5-35B-A3B | ~33 million tokens |
-| Llama 3.3 70B | ~25 million tokens |
-| DeepSeek V3 | ~20 million tokens |
-| Llama 3.1 8B | ~100 million tokens |
+| :---- | :--------------------- |
+| **GPT-6 Luna** | ~50 million input tokens (or 10M output tokens) |
+| **Qwen 3.8 27B Dense** (`dos`) | ~33 million tokens |
+| **DeepSeek V4.1 Flash** | ~35 million tokens |
+| **Gemini 3.8 Flash** | ~6.3 million tokens |
 
 > Free credits do not expire. No credit card is required to start.
 
@@ -28,26 +28,37 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 
 ## Per-Token Pricing
 
-Pricing is calculated per **1 million tokens** (input, output, and cached input). All rates are database-driven and strictly follow official provider published prices.
+Pricing is calculated per **1 million tokens** (input, output, and cached input). All rates are statically database-driven from the Supabase catalog (`dosai.model_pricing`) and strictly follow official provider published prices.
 
-| Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) |
-| :---- | :------- | :------------------- | :-------------------- | :-------------------- |
-| **Qwen3.5-35B-A3B** (default) | Alibaba / Self-hosted | $0.15 | $0.15 | — |
-| **DeepSeek V4 Pro** | DeepSeek / Alibaba | $2.40 | $4.80 | $0.20 |
-| **Qwen3.8 27B** | Alibaba | $0.50 | $3.00 | $0.10 |
-| **Llama 4 Maverick 17B-128E** | Meta / DeepInfra | $0.17 | $0.66 | — |
-| **Llama 4 Scout 17B-16E** | Meta / DeepInfra | $0.11 | $0.38 | — |
-| **DeepSeek V3** | DeepSeek | $0.25 | $0.25 | — |
-| **Llama 3.3 70B** | Meta | $0.20 | $0.20 | — |
-| **Llama 3.1 8B** | Meta | $0.05 | $0.05 | — |
+### Smart Router & Self-Hosted Models
 
-> Prices are statically database-driven from Supabase catalog and updated strictly via migrations. Check the [dashboard](https://app.dos.ai/models) or `GET /v1/models` for real-time account pricing.
+| Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) | Billing Policy |
+| :---- | :------- | :------------------- | :-------------------- | :-------------------- | :------------- |
+| **Smart Router (`auto`)** | Dynamic | Variable | Variable | Variable | Billed at target model's exact rate |
+| **Qwen 3.8 27B Dense (`dos`)** | Self-hosted (Singapore) | $0.15 | $0.15 | — | Stable fixed rate |
+
+### Frontier & Partner Cloud Models
+
+| Model | Provider | Input Price (per 1M) | Output Price (per 1M) | Cached Input (per 1M) | Context Window |
+| :---- | :------- | :------------------- | :-------------------- | :-------------------- | :------------- |
+| **GPT-6 Luna** | OpenAI / Azure | **$0.10** | **$0.50** | $0.01 | 1.05M |
+| **GPT-6 Sol** | OpenAI / Azure | $2.00 | $10.00 | $0.20 | 1.05M |
+| **GPT-6 Astra** | OpenAI | $5.00 | $25.00 | $0.50 | 1.05M |
+| **Gemini 3.8 Flash** | Google Cloud | $0.79 | $3.94 | $0.20 | 1M |
+| **DeepSeek V4.1 Flash** | Alibaba / DeepSeek | $0.14 | $0.28 | $0.035 | 1M |
+| **Qwen 3.8 27B** | Alibaba Cloud | $0.50 | $3.00 | $0.10 | 1M |
+| **Qwen 3.8 Max** | Alibaba Cloud | $1.87 | $5.62 | $0.47 | 1M |
+| **Claude Sonnet 5** | Anthropic | $3.00 | $15.00 | $0.30 | 1M |
+| **Claude Opus 5** | Anthropic | $15.00 | $75.00 | $1.50 | 1M |
+
+> Prices are statically database-driven from the Supabase catalog and updated strictly via migrations. Check the [dashboard](https://app.dos.ai/models) or `GET /v1/models` for real-time account pricing.
 
 ### Prompt Caching Savings
 
-For supported models (including DeepSeek V4 Pro and Qwen 3.8), repeated prompt prefixes automatically benefit from prompt caching:
-- **DeepSeek V4 Pro**: Cached input tokens are billed at **$0.20 / 1M tokens** (over 90% savings compared to standard input).
+For supported models (including GPT-6 series, DeepSeek V4.1, and Qwen 3.8), repeated prompt prefixes automatically benefit from prompt caching:
+- **GPT-6 Luna**: Cached input tokens are billed at **$0.01 / 1M tokens** (90% savings).
 - **Qwen 3.8 27B**: Cached input tokens are billed at **$0.10 / 1M tokens** (80% savings).
+- **DeepSeek V4.1 Flash**: Cached input tokens are billed at **$0.035 / 1M tokens** (75% savings).
 
 ---
 
@@ -58,6 +69,7 @@ A token is roughly 3-4 characters of English text, or about 0.75 words. For exam
 - "Hello, world!" = approximately 4 tokens
 - A typical 500-word blog post = approximately 650-700 tokens
 - A full 128K context window = approximately 96,000 words
+- A 1.05M context window = approximately 780,000 words
 
 ---
 
@@ -81,7 +93,8 @@ Every API response includes a `usage` object showing exactly how many tokens wer
     "total_tokens": 445,
     "prompt_tokens_details": {
       "cached_tokens": 100
-    }
+    },
+    "cost": 0.0001725
   }
 }
 ```
@@ -136,4 +149,3 @@ No. You pay only for the tokens you consume. There are no platform fees, no per-
 ### How can I get a tax receipt or VAT invoice?
 
 For international credit card payments processed via Stripe, you can access official Stripe payment receipts and hosted invoices directly from the **Billing History** table at [app.dos.ai/billing](https://app.dos.ai/billing). For corporate billing or Vietnamese tax invoices (e-invoicing via MISA meInvoice), configure your company legal name, tax code, and registered billing address under [Billing Preferences](https://app.dos.ai/billing?tab=tax).
-
