@@ -130,6 +130,33 @@ Google's high-speed multimodal reasoning model with hybrid thinking, 1M context 
 
 ---
 
+## Operational Telemetry & Provider Comparison
+
+Every model detail page in the [Dashboard](https://app.dos.ai/models) features live, rolling operational telemetry across all active provider routes:
+
+| Metric | Description | Source / Contract |
+| :----- | :---------- | :---------------- |
+| **Median Latency (p50)** | Median round-trip execution latency | Real observed inference requests over a 7-day rolling window |
+| **P95 Latency** | 95th-percentile response latency | Measures tail latency under peak conditions |
+| **TTFT (Time-to-First-Token)** | Time to first streaming token | Observed on streaming requests across edge locations |
+| **Throughput (TPS)** | Tokens generated per second (`tok/s`) | Real measured generation throughput |
+| **Uptime & Reliability** | Success ratio percentage over total attempts | Excludes client-side cancellations and user-side bad requests |
+
+> **Telemetry Sample Threshold**: To maintain rigorous evidence standards, a model route requires at least **20 valid samples** before publishing live operational telemetry. Routes with fewer observations report `insufficient_data` or `unavailable` with clean dash (`-`) indicators until warmed up.
+
+---
+
+## Independent Benchmarks
+
+DOS AI continuously synchronizes independent benchmark evidence from leading evaluation authorities, attributing each metric with capture dates and direct evaluation links:
+
+- **Artificial Analysis**: Intelligence Index, Coding Index, and Agentic Index.
+- **Design Arena**: Elo rating, win rate percentage, and leaderboard rank.
+
+Benchmark scores are displayed directly on each model's detail page, complete with normalized visual progress bars (0–100) and direct hyperlinks to public methodology audits.
+
+---
+
 ## Listing Models via API
 
 Retrieve the current list of available models programmatically:

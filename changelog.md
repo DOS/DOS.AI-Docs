@@ -9,6 +9,14 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-10-06
+
+- **feature** [dashboard] Restored Throughput (TPS) in Model Provider Comparison - Restored token throughput (`tok/s`) across model provider comparison and pricing tables in both web and app, connecting real measured generation speed alongside median latency and uptime reliability.
+- **feature** [dashboard] Automated Public Benchmark Evidence Pipeline - Synced independent model benchmarks across 45 catalog models directly from Artificial Analysis (Intelligence Index, Coding Index, Agentic Index) and Design Arena (Elo, win rate %, leaderboard rank) with normalized visual progress bars and public citations.
+- **improvement** [dashboard] Full-Width Model Description & UI Polish - Removed constrained width bounds (`max-w-4xl`) on model detail pages across `@dos/web` and `@dos/app`, allowing description, about, and capabilities to fill the full viewport and eliminate awkward empty margins.
+- **feature** [gateway] Ultra-Low-Cost Telemetry Warmup Pipeline - Added minimal 1-token telemetry prober script (`scripts/warmup-model-telemetry.mjs`) to warm up cold models to the 20-sample threshold required for live telemetry publishing at negligible token cost (<$0.001 per model).
+- **improvement** [gateway] Account-Level Cash Gate & Promotional Credit Policy - Clarified and reinforced the account-level Cash Gate where unfunded accounts use promotional credits on in-house endpoints (`dos`), and depositing any initial balance permanently unlocks all promotional and bonus credits across all frontier catalog models.
+
 ## 2026-10-03
 
 - **feature** [dosclaw] Agent Model Priority Support for Image Generation Models - Enabled configuring dedicated image models (`wan2.2-t2i-flash`, Google Gemini Image) in DOSClaw Agent Model Priority chains with fail-closed explicit routing and primary chat model guardrails (image models cannot serve as primary chat)

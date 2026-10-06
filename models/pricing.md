@@ -11,7 +11,7 @@ DOS AI operates on a strict **Zero-Markup Policy**:
 
 ---
 
-## Free Tier
+## Free Tier & Promotional Credits
 
 Every new account receives **$5.00 in free credits** to get started. This is enough for substantial experimentation and prototyping before you need to add funds.
 
@@ -23,6 +23,12 @@ Every new account receives **$5.00 in free credits** to get started. This is eno
 | **Gemini 3.8 Flash** | ~6.3 million tokens |
 
 > Free credits do not expire. No credit card is required to start.
+
+### Cash Gate & Promotional Credit Policy
+
+To prevent multi-account abuse on upstream cloud providers while offering friction-free onboarding, DOS AI implements an account-level **Cash Gate**:
+- **First-Time / Unfunded Accounts**: Promotional credits (welcome bonus, coupons, referral rewards) can be used freely for DOS AI's curated in-house endpoints (`model: "dos"`).
+- **Cash Gate Unlock**: Once an account completes its first real deposit/top-up (minimum $5.00), the Cash Gate is permanently unlocked for that account. All remaining promotional credits, bonus balances, and coupons can then be spent across **any model in the entire catalog**, including frontier third-party providers.
 
 ---
 
