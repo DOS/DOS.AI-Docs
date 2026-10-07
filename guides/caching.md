@@ -1,71 +1,140 @@
-# Response Caching
+# Caching & Context Optimization
 
-DOS AI caches non-streaming responses so that an identical request can be served instantly from memory, with **no upstream model call and no token charge**. Caching is **on by default for deterministic requests** (`temperature: 0`) and is fully under your control with a single header.
+DOS AI provides a multi-layer caching and context optimization system designed to minimize latency, reduce token consumption, and cut API costs. This includes:
 
-## How it works
+1. **L1 Response Caching**: Instant, sub-millisecond serving of identical requests at **0 tokens and $0 cost**.
+2. **Upstream Prompt Caching Pass-Through**: Full preservation of upstream prompt caching markers with **100% discount pass-through** (zero-markup).
+3. **Context & Prompt Compression**: Opt-in payload compaction for large contexts.
 
-For an eligible request, DOS AI builds an exact-match key from the endpoint and the request body. If an unexpired response with the same key exists, it is returned immediately:
+---
 
-- The response is **free** - no tokens are billed.
-- It returns in sub-millisecond time, with no model call.
-- The response carries `X-DOS-Cache: hit` and `X-Provider: cache`.
+## 1. L1 Response Caching
 
-If there is no match, the request runs normally, the response is returned with `X-DOS-Cache: miss`, and it is stored for next time. Cached entries live for up to **24 hours**.
+DOS AI caches completed inference responses in a fast, in-memory LRU layer. When an identical request arrives, it is served immediately without calling the upstream model.
 
-## When a request is cached
+### Key Benefits
 
-| `X-DOS-Cache` request header | Behavior |
+* **Zero Token Cost**: Cache hits never consume tokens or billing credits.
+* **Sub-Millisecond Latency**: Responses return in < 1ms directly from the gateway edge.
+* **Streaming & Non-Streaming**: Both standard JSON completions and streaming SSE (`stream: true`) responses are supported via stream replay.
+* **Strict Tenant Isolation**: Powered by `TenantCacheScope`, cached entries are strictly isolated to your authenticated identity (User ID, API Key ID, Team ID, Product, and BYOK credential). Cache items are never shared across tenants.
+
+### Cache Controls (`X-DOS-Cache`)
+
+| `X-DOS-Cache` Request Header | Behavior |
 | ---------------------------- | -------- |
-| *(omitted)* | Cached only when the request is **deterministic** (`temperature: 0`). This is the default. |
-| `on` | Force caching on, even for `temperature > 0`. Use this when you are happy to receive a stored response for repeated identical requests. |
-| `off` | Disable caching for this request - always call the model. |
+| *(omitted)* | **Default-on for deterministic requests** (`temperature: 0`). Non-deterministic requests bypass the cache. |
+| `on` | **Force caching on**, even when `temperature > 0`. Useful when you want fixed responses for identical prompts. |
+| `off` | **Bypass caching entirely** — guarantees a fresh generation directly from the upstream provider. |
 
-Only **non-streaming** [Chat Completions](chat-completions.md) / Completions are cached. Streaming responses (`stream: true`) are never cached.
+### Response Headers
 
-## What counts as "the same request"
+| Header | Value / Meaning |
+| ------ | --------------- |
+| `X-DOS-Cache` | `hit` (served free from cache) or `miss` (fresh generation from model). |
+| `X-Provider` | Displays `cache` on a cache hit instead of the upstream provider name. |
 
-The cache key is a hash of the endpoint path plus the request body in canonical form. Two requests hit the same entry when their JSON bodies are identical after:
+### What Counts as "The Same Request"
 
-- sorting object keys (field order does not matter), and
-- ignoring the non-output fields `stream`, `stream_options`, `user`, and `metadata`.
+The cache key is computed as the SHA-256 hash of:
+1. The authenticated tenant scope (`TenantCacheScope`),
+2. The endpoint path (e.g. `/v1/chat/completions`),
+3. The canonical JSON request body.
 
-Everything else - `model`, `messages`, `temperature`, `max_tokens`, `tools`, and so on - is part of the key, so any change produces a different entry.
+Field ordering does not matter, and non-output metadata fields (`stream`, `stream_options`, `user`, `metadata`) are stripped before hashing. All generation parameters (`model`, `messages`, `temperature`, `max_tokens`, `tools`) form part of the key.
 
-The exact-match cache is **global but cross-user safe**: a hit requires a byte-identical request that the caller already has, and the response is a pure function of that public input, so nothing private is shared between accounts.
+### Example: Using Response Cache
 
-## Response headers
+```bash
+# First request: Cache miss (fresh model call)
+curl -i https://api.dos.ai/v1/chat/completions \
+  -H "Authorization: Bearer dos_sk_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "deepseek/deepseek-chat", "temperature": 0, "messages": [{"role": "user", "content": "What is the capital of Vietnam?"}]}'
 
-| Header | Meaning |
-| ------ | ------- |
-| `X-DOS-Cache: hit` | Served from cache - free, no model call. |
-| `X-DOS-Cache: miss` | Not in cache (or first time) - served by the model. |
-| `X-Provider: cache` | Present on a hit, in place of the usual provider name. |
+# Second request: Cache hit (instant <1ms, 0 tokens, $0 cost)
+# Response header: X-DOS-Cache: hit, X-Provider: cache
+curl -i https://api.dos.ai/v1/chat/completions \
+  -H "Authorization: Bearer dos_sk_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "deepseek/deepseek-chat", "temperature": 0, "messages": [{"role": "user", "content": "What is the capital of Vietnam?"}]}'
+```
 
-## Examples
+---
 
-A deterministic request is cached automatically. Run this twice - the first call is a `miss`, the second is a `hit` (instant and free):
+## 2. Upstream Prompt Caching & Zero-Markup Guarantee
+
+When working with long prompts, multi-turn conversations, or complex agent workflows, major foundation models (Anthropic, OpenAI, DeepSeek, Google Gemini) offer **Prompt Caching** (Context Caching).
+
+DOS AI fully preserves these caching capabilities and enforces a strict **Zero-Markup Policy**: **100% of provider cache discounts are passed directly to you**.
+
+### Supported Provider Caching Protocols
+
+* **Anthropic Claude**: Full support for explicit breakpoint markers:
+  ```json
+  "content": [
+    {
+      "type": "text",
+      "text": "Your large system prompt, documentation, or codebase...",
+      "cache_control": {"type": "ephemeral"}
+    }
+  ]
+  ```
+  * Up to 4 cache breakpoints per request.
+  * **90% discount** on cached input tokens passed through with zero markup.
+* **OpenAI & Azure OpenAI**: Automatic prefix caching on prompts longer than 1,024 tokens.
+  * **50% discount** on cached input tokens passed through.
+* **DeepSeek & Alibaba DashScope**: Automatic context caching for repeated prefix blocks.
+* **Google Gemini**: Implicit context caching for long context windows.
+
+### Verifying Cache Usage
+
+The response `usage` block explicitly reports cached token savings:
+
+```json
+{
+  "usage": {
+    "prompt_tokens": 12500,
+    "completion_tokens": 340,
+    "total_tokens": 12840,
+    "prompt_tokens_details": {
+      "cached_tokens": 12000
+    },
+    "cost": 0.00350
+  }
+}
+```
+
+In the example above, you are billed for 12,000 tokens at the discounted cached input rate, and only 500 tokens at the standard base input rate.
+
+---
+
+## 3. Prompt Compression (`X-DOS-Prompt-Compression`)
+
+For applications sending very large conversation histories or repetitive data, DOS AI includes a multi-layer context compression engine powered by DOSRouter.
+
+### How it Works
+
+When opted in:
+1. It analyzes requests longer than 5,000 characters.
+2. It deduplicates repeated messages, strips redundant whitespace in code and text, and compacts verbose JSON blocks.
+3. It retains 100% semantic fidelity and formatting tags.
+
+### Enabling Prompt Compression
+
+Because byte-exact prefix caching depends on identical input bytes, prompt compression is **opt-in** to avoid invalidating upstream cache hashes:
 
 ```bash
 curl -i https://api.dos.ai/v1/chat/completions \
   -H "Authorization: Bearer dos_sk_your_key" \
+  -H "X-DOS-Prompt-Compression: true" \
   -H "Content-Type: application/json" \
-  -d '{"model": "dos-ai", "temperature": 0, "messages": [{"role": "user", "content": "Capital of Vietnam?"}]}'
+  -d '{"model": "qwen/qwen-2.5-coder-32b-instruct", "messages": [...large messages...]}'
 ```
 
-To cache a non-deterministic request (`temperature > 0`), opt in with the header:
+When compression is applied, the response includes an efficiency header:
 
-```bash
-curl -i https://api.dos.ai/v1/chat/completions \
-  -H "Authorization: Bearer dos_sk_your_key" \
-  -H "X-DOS-Cache: on" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "dos-ai", "temperature": 0.7, "messages": [{"role": "user", "content": "Capital of Vietnam?"}]}'
+```http
+X-DOS-Compression-Savings: 3412
 ```
-
-To always bypass the cache, send `X-DOS-Cache: off`.
-
-## Notes
-
-- **Free hits.** A cache hit never consumes tokens or credits.
-- **Disable per request** with `X-DOS-Cache: off` when you always need a fresh generation.
-- **Today's cache is exact-match.** Semantic (similar-but-not-identical) caching and a shared cross-instance layer are planned follow-ups.
+*(Indicates that 3,412 redundant characters were pruned before calling the model).*

@@ -18,6 +18,7 @@
 * [Bring Your Own Key (BYOK)](guides/byok.md)
 * [Guardrails](guides/guardrails.md)
 * [Response Caching](guides/caching.md)
+* [Token & Cost Optimization](guides/token-optimization.md)
 * [Developer Tools & IDEs](guides/dev-tools-integration.md)
 
 ## Models
