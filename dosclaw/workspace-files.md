@@ -53,3 +53,19 @@ Merchants and developers can customize their agent's personality through the DOS
    - The agent retains the ability to call `search_knowledge` for verified FAQ answers.
    - The agent retains connected e-commerce or CRM tools.
    - The agent adheres to anti-echo directives and tool-first action invariants.
+
+---
+
+## Dual-Profile Architecture (`agents.list`)
+
+Modern OpenClaw agent containers provisioned by DOS.AI define two execution profiles in `agents.list`:
+
+1. **`main` Profile (`default: true`)**:
+   - Uses `/workspace/IDENTITY.md` for identity and persona.
+   - Serves direct customer direct messages (DMs) and authenticated business interactions.
+   - Has full access to enabled business MCP tools and connectors.
+2. **`collaboration` Profile**:
+   - Renders with a distinctive identity: `<AgentName> (Collaboration 🤝)`.
+   - Restricts tool execution (`tools: { deny: ["*"] }`).
+   - Serves untrusted group mentions (`@DOS` or bot tag in public groups) without exposing write tools or private customer data to channel members.
+
