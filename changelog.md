@@ -9,6 +9,13 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-10-11
+
+- **feature** [dosclaw] OpenClaw v2026.9.9 Runtime Preview & Emergency Denylist Governance - Added OpenClaw v2026.9.9 into the preview version matrix, guarded by runtime version floor and emergency version denylist admission control (`OPENCLAW_DENIED_VERSIONS`) that strictly denies revoked upstream tags and mutable `:latest` fallbacks when denylist is active.
+- **improvement** [dosclaw] Pre-Stop Container Upgrade Safety & Fail-Closed Volume Cleanup - Hardened container lifecycle to preflight image pulls and verify data backups before stopping running containers, and automatically clean up Docker volumes (`RemoveVolume`) on provision failures to prevent orphaned storage leaks.
+- **improvement** [dosclaw] Trusted-Proxy Device Auto-Approval & Loopback Password CLI - Configured OpenClaw 2026.9+ trusted-proxy authentication with automatic device approval for operator scopes, RFC1918 CIDR bindings, loopback password CLI authentication, and self-healing session migration.
+- **improvement** [gateway] AR Review Worker AbortSignal Propagation & Admission Deadline - Propagated AbortSignal into review admission before reserving worker leases, preventing unmetered credit usage and dangling lease reservations on canceled review requests.
+
 ## 2026-10-06
 
 - **feature** [dashboard] Restored Throughput (TPS) in Model Provider Comparison - Restored token throughput (`tok/s`) across model provider comparison and pricing tables in both web and app, connecting real measured generation speed alongside median latency and uptime reliability.
