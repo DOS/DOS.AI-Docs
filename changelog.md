@@ -9,6 +9,14 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-10-15
+
+- **feature** [dosclaw] Hermes Agent v0.22.0 "The Threshold Release" Runtime Upgrade - Upgraded the default Hermes agent container runtime to v0.22.0 (`NousResearch/hermes-agent:v0.22.0@sha256:c69536a39e885b8943329bda68cdf44492458b96aa74a212239bde9d2aeb406a`) with clean no-op config migration (schema version 50), SemVer comparison bridging, automated Docker canary verification, and safe rollback image pinning to v0.21.6.
+
+## 2026-10-14
+
+- **feature** [dosclaw] OpenClaw v2026.10.3 Automated Release Admission & Beta Canary - Admitted OpenClaw v2026.10.3 into customer-memory runtime matrix (`customerMemoryOpenClawVersions`) via automated CI admission checks (GHCR/Docker Hub dual digest matching, customer memory contract, Honcho ingress contract, version gate) and verified green canary on Em Huyền Beta.
+
 ## 2026-10-11
 
 - **feature** [dosclaw] OpenClaw v2026.9.9 Runtime Preview & Emergency Denylist Governance - Added OpenClaw v2026.9.9 into the preview version matrix, guarded by runtime version floor and emergency version denylist admission control (`OPENCLAW_DENIED_VERSIONS`) that strictly denies revoked upstream tags and mutable `:latest` fallbacks when denylist is active.
