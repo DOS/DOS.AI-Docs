@@ -25,7 +25,7 @@ const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN") || "";
 const VLLM_URL = Deno.env.get("VLLM_URL") || "https://inference.dos.ai";
 const VLLM_API_KEY = Deno.env.get("VLLM_API_KEY") || "";
 const OPENCLAW_REPO = "openclaw/openclaw";
-const CHANGELOG_PATH = new URL("../CHANGELOG.md", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
+const CHANGELOG_PATH = new URL("../changelog.md", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
 
 interface ChangelogEntry {
   date: string;
