@@ -9,6 +9,11 @@ Products: `dosclaw`, `dashboard`, `gateway`, `dosafe`, `inference`
 
 ---
 
+## 2026-10-16
+
+- **feature** [inference] Meta Superintelligence Labs Native Provider & Muse Model Family - Integrated the official Meta AI API (`https://api.meta.ai/v1`) and onboarded 5 Meta Muse models (`muse-wonder-1.0`, `muse-spark-1.3`, `muse-spark-1.3-contributor`, `muse-spark-1.2`, `muse-spark-1.1`) with zero-markup list pricing ($0.26–$0.36 input / $1.04–$1.52 output per 1M tokens, $0.04 cached input) and complimentary Meta Contributor tier support.
+- **improvement** [dashboard] Author Release Date Standardization & Navigation Polish - Backfilled verified official creator release dates (`capabilities.released_at`) and `series` identifiers across all 76+ catalog models so `/models` orders models accurately by author release date with automatic `New` badges, and standardized navigation menu labels to plural **Models** across `@dos/web` and `@dos/app`.
+
 ## 2026-10-15
 
 - **feature** [dosclaw] Hermes Agent v0.22.0 "The Threshold Release" Runtime Upgrade - Upgraded the default Hermes agent container runtime to v0.22.0 (`NousResearch/hermes-agent:v0.22.0@sha256:c69536a39e885b8943329bda68cdf44492458b96aa74a212239bde9d2aeb406a`) with clean no-op config migration (schema version 50), SemVer comparison bridging, automated Docker canary verification, and safe rollback image pinning to v0.21.6.

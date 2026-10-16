@@ -62,6 +62,11 @@ Requests to `model: "dos"` execute on the in-house Singapore GPU cluster with au
 | **Qwen 3.8 Max** | Alibaba Cloud | 1M | $2.00 | $6.00 | `qwen3.8-max` | Multilingual reasoning, complex logic |
 | **Claude Sonnet 5** | Anthropic | 1M | $3.00 | $15.00 | `claude-sonnet-5` | Enterprise agentic coding, 128K output |
 | **Claude Opus 5** | Anthropic | 1M | $15.00 | $75.00 | `claude-opus-5` | Flagship reasoning, long-horizon tasks |
+| **Muse Wonder 1.0** | Meta | 128K | $0.30 | $1.20 | `muse-wonder-1.0` | Multimodal design, UI/UX & front-end code generation |
+| **Muse Spark 1.3** | Meta | 128K | $0.36 | $1.52 | `muse-spark-1.3` | Flagship multimodal reasoning, native tool use, visual chain-of-thought |
+| **Muse Spark 1.3 (Contributor)** | Meta | 128K | $0.00 | $0.00 | `muse-spark-1.3-contributor` | Complimentary contributor tier for multimodal reasoning & tools |
+| **Muse Spark 1.2** | Meta | 128K | $0.26 | $1.04 | `muse-spark-1.2` | Fast multimodal chat, vision & tool calling |
+| **Muse Spark 1.1** | Meta | 128K | $0.36 | $1.42 | `muse-spark-1.1` | Foundational Muse Spark release with vision & structured outputs |
 
 > All prices are in USD and strictly adhere to DOS AI's **Zero-Markup Policy** (100% of provider published list price). Check `GET /v1/catalog` or the [web dashboard](https://app.dos.ai/models) for real-time status.
 
@@ -115,6 +120,13 @@ Google's high-speed multimodal reasoning model with hybrid thinking, 1M context 
 - **Strengths**: 1M context, sub-second TTFT, native audio/video/image comprehension
 - **Model ID**: `gemini-3.8-flash`
 
+### Meta Muse Family (`muse-wonder-1.0` & `muse-spark-1.3`)
+Meta Superintelligence Labs' flagship natively multimodal family built for visual chain-of-thought reasoning, multi-agent orchestration, and high-craft front-end/UI engineering.
+
+- **Best for**: UI/UX design & interactive front-end code generation (`muse-wonder-1.0`), multimodal reasoning & tool calling (`muse-spark-1.3`)
+- **Strengths**: 128K context window, native vision + text input, 89%–90% prompt caching discount ($0.04/1M cached input), complimentary `muse-spark-1.3-contributor` tier
+- **Model ID**: `muse-wonder-1.0`, `muse-spark-1.3`, `muse-spark-1.3-contributor`, `muse-spark-1.2`, `muse-spark-1.1`
+
 ---
 
 ## Choosing the Right Model
@@ -125,6 +137,7 @@ Google's high-speed multimodal reasoning model with hybrid thinking, 1M context 
 | **Fastest agent execution & lowest latency** | `dos` | Self-hosted 27B dense cluster in Singapore, sub-250ms TTFT |
 | **Ultra-low cost frontier reasoning** | `gpt-6-luna` | $0.10 / $0.50 per million tokens with 1.05M context |
 | **Sub-second large document analysis** | `gemini-3.8-flash` | 1M context window, Google Cloud high-throughput backend |
+| **UI/UX design & front-end code generation** | `muse-wonder-1.0` | Meta's specialized design & creative coding model ($0.30 / $1.20 per 1M) |
 | **Enterprise agentic coding & architecture** | `claude-sonnet-5` | Frontier coding quality with 128K max output tokens |
 | **Deep mathematical reasoning** | `deepseek-v4-pro` | SOTA chain-of-thought problem solving |
 

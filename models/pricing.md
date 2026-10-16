@@ -59,17 +59,23 @@ Pricing is calculated per **1 million tokens** (input, output, and cached input)
 | **Qwen 3.8 Max** | Alibaba Cloud | $2.00 | $6.00 | $0.25 | 1M |
 | **Claude Sonnet 5** | Anthropic | $3.00 | $15.00 | $0.30 | 1M |
 | **Claude Opus 5** | Anthropic | $15.00 | $75.00 | $1.50 | 1M |
+| **Muse Wonder 1.0** | Meta | $0.30 | $1.20 | $0.04 | 128K |
+| **Muse Spark 1.3** | Meta | $0.36 | $1.52 | $0.04 | 128K |
+| **Muse Spark 1.3 (Contributor)** | Meta | $0.00 | $0.00 | $0.00 | 128K |
+| **Muse Spark 1.2** | Meta | $0.26 | $1.04 | $0.04 | 128K |
+| **Muse Spark 1.1** | Meta | $0.36 | $1.42 | $0.04 | 128K |
 
 > Prices are statically database-driven from the Supabase catalog and updated strictly via migrations. Check the [dashboard](https://app.dos.ai/models) or `GET /v1/models` for real-time account pricing.
 
 ### Prompt Caching Savings
 
-For supported models (including GPT-6 series, DeepSeek V4.1, and Qwen 3.8), repeated prompt prefixes automatically benefit from prompt caching:
+For supported models (including GPT-6 series, DeepSeek V4.1, Qwen 3.8, and Meta Muse), repeated prompt prefixes automatically benefit from prompt caching:
 - **GPT-6 Luna**: Cached input tokens are billed at **$0.01 / 1M tokens** (90% savings).
 - **Qwen 3.8 Flash**: Cached input tokens are billed at **$0.016 / 1M tokens** (89% savings).
 - **Qwen 3.8 27B**: Cached input tokens are billed at **$0.10 / 1M tokens** (80% savings).
 - **Qwen 3.8 Max**: Cached input tokens are billed at **$0.25 / 1M tokens** (87.5% savings).
 - **DeepSeek V4.1 Flash**: Cached input tokens are billed at **$0.03 / 1M tokens** (90% savings).
+- **Meta Muse (`muse-wonder-1.0`, `muse-spark-1.3`)**: Cached input tokens are billed at **$0.04 / 1M tokens** (up to 89% savings).
 
 ---
 
