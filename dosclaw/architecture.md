@@ -113,3 +113,7 @@ DOSClaw maintains strict version governance to prevent agents from running on br
    - On 2026.9+, configures `gateway.auth.mode = "trusted-proxy"` with `deviceAutoApprove.enabled = true` and `operator.*` scopes, omitting `auth.token` to satisfy mutual exclusivity rules.
    - Binds RFC1918 CIDRs (`127.0.0.1`, `::1`, `172.16.0.0/12`, `10.0.0.0/8`, `192.168.0.0/16`) for seamless console-proxy and Status API connectivity across Docker bridge network reassignment.
    - Enables loopback CLI password authentication (`OPENCLAW_GATEWAY_PASSWORD`) for in-container channel watchdog and status inspection.
+4. **Hermes Agent Runtime Integration**:
+   - Alongside OpenClaw, DOSClaw integrates NousResearch's Hermes Agent (`nousresearch/hermes-agent:v0.22.0`) as a high-autonomy reasoning runtime.
+   - Runs in isolated Docker containers with internal REST/SSE endpoints (`:8642`), automated migrations (preserving seed schema version 33), and customer-memory model-facing tools (`search_memory`, `remember`).
+
